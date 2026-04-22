@@ -4,10 +4,13 @@ from autobahn.twisted.util import sleep
 
 @inlineCallbacks
 def main(session, details):
-	yield session.call("rom.optional.behavior.play", name="BlocklyStand")
-	yield session.call("rie.dialogue.say", text="Hallo wereld!")
-	yield sleep(2)
+	yield session.call("rie.dialogue.config.language", lang="en")
+	yield session.call("rom.optional.behavior.play",name="BlocklyStand")
+	yield session.call("rie.dialogue.say", text="Hello, my name is Alpha mini")
+	yield sleep(1)
 	yield session.call("rom.optional.behavior.play", name="BlocklyWaveRightArm")
+	yield sleep(1)
+	yield session.call("rie.dialogue.say", text="What is your name?")
 	session.leave() # Close the connection with the robot
 
 wamp = Component(
