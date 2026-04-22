@@ -1,0 +1,3 @@
+autobahn[twisted,serialization]
+pyopenssl
+alpha_mini_rug
