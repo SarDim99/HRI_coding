@@ -7,7 +7,7 @@ import os
 
 MODEL_NAME = "gpt-4o-mini"
 
-# Tells the model how to behave.
+# Tells the model how to behave
 SYSTEM_PROMPT = (
     "You are a friendly social robot talking to a person out loud."
     "Keep replies relatively short and easy to listen to. "
@@ -62,15 +62,15 @@ def main(session, details):
     global finish_dialogue, query, response_text
 
     yield session.call("rie.dialogue.config.language", lang="en")
-    # let the robot stand up
+    # robot stand up
     yield session.call("rom.optional.behavior.play", name="BlocklyStand")
 
-    # greet the user, then prompt them to say something
+    # Greet prompt
     yield session.call("rie.dialogue.say", text="Hello there! It's nice to see you.")
     yield sleep(1)
     yield session.call("rie.dialogue.say", text="You can start a conversation with me whenever you're ready.")
 
-    # setting up the automatic speech recognition
+    # Speech recognition (Not sure it works)
     yield session.subscribe(asr, "rie.dialogue.stt.stream")
     yield session.call("rie.dialogue.stt.stream")
 
@@ -107,7 +107,7 @@ wamp = Component(
         "serializers": ["msgpack"],
         "max_retries": 0
     }],
-    realm="rie.6915b9ab375fb38004f52a7d",
+    realm="rie.69ea1a3a26d8af16808252ab",  # !!!!!!! Check this in case of failure to connect!!!!!!
 )
 
 wamp.on_join(main)
