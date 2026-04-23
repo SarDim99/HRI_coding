@@ -1,78 +1,94 @@
 from autobahn.twisted.component import Component, run
 from twisted.internet.defer import inlineCallbacks
 from autobahn.twisted.util import sleep
-from google import genai
-from google.genai import types
+from openai import OpenAI
 import os
 
 
-# This demo is a very straightforward implementation of a text-based chatbot using google's
-# generative AI, Gemini
-# To use Gemini, you need to acquire a (free) key that you submit to your system environment.
-# Learn more at https://ai.google.dev/gemini-api
+MODEL_NAME = "gpt-4o-mini"
 
-# Setting the API KEY
-chatbot = genai.Client(api_key=os.environ["API_KEY"])
-# Alternatively, use
-# chatbot = genai.Client(api_key="your_API_key_from_google")
-
-response = chatbot.models.generate_content(
-    model="gemini-2.5-flash",
-    config=types.GenerateContentConfig(
-        system_instruction="None"),
-    contents="Hello there"
+# Tells the model how to behave.
+SYSTEM_PROMPT = (
+    "You are a friendly social robot talking to a person out loud."
+    "Keep replies relatively short and easy to listen to. "
+    "Avoid markdown, lists, or emoji."
 )
 
-print(response.text)
+
+# export OPENAI_API_KEY="API_KEY"
+chatbot = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+
+def ask_llm(user_text: str) -> str:
+    conversation_history.append({"role": "user", "content": user_text})
+
+    response = chatbot.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[{"role": "system", "content": SYSTEM_PROMPT}] + conversation_history,
+    )
+
+    reply = response.choices[0].message.content.strip()
+
+    conversation_history.append({"role": "assistant", "content": reply})
+
+    return reply
+
+
+conversation_history: list[dict] = []
+
+# Smoke test on startup
+print(ask_llm("Hello there"))
+
 
 exit_conditions = (":q", "quit", "exit")
 
 finish_dialogue = False
 query = "hello"
-response = "qqq"
+response_text = ""
+
 
 def asr(frames):
     global finish_dialogue
     global query
     if frames["data"]["body"]["final"]:
         query = str(frames["data"]["body"]["text"]).strip()
-        print("ASR response: ",query)
+        print("ASR response: ", query)
         finish_dialogue = True
-    print("finish: ",finish_dialogue)
+    print("finish: ", finish_dialogue)
+
 
 @inlineCallbacks
 def main(session, details):
-    global finish_dialogue, query, response
-    # set language to English (use 'nl' for Dutch)
+    global finish_dialogue, query, response_text
+
     yield session.call("rie.dialogue.config.language", lang="en")
     # let the robot stand up
-    yield session.call("rom.optional.behavior.play",name="BlocklyStand")
+    yield session.call("rom.optional.behavior.play", name="BlocklyStand")
 
-    # prompt from the robot to the user to say something
-    yield session.call("rie.dialogue.say", text="You can start a conversation with me.")
+    # greet the user, then prompt them to say something
+    yield session.call("rie.dialogue.say", text="Hello there! It's nice to see you.")
+    yield sleep(1)
+    yield session.call("rie.dialogue.say", text="You can start a conversation with me whenever you're ready.")
 
     # setting up the automatic speech recognition
-    # subscribes the asr function with the input stt stream
     yield session.subscribe(asr, "rie.dialogue.stt.stream")
-    # calls the stream. From here, the robot prints each 'final' sentence
     yield session.call("rie.dialogue.stt.stream")
 
-    # loop while user did not say exit or quit
+    # loop until the user says exit or quit
     dialogue = True
     while dialogue:
-        if (finish_dialogue):
+        if finish_dialogue:
             yield session.call("rie.dialogue.stt.close")
             yield sleep(1)
             print("also here ", query)
             if query in exit_conditions:
                 dialogue = False
-                yield session.call("rie.dialogue.say","ok, I will leave you then")
+                yield session.call("rie.dialogue.say", text="Goodbye! It was nice talking with you. See you again next time.")
                 break
-            elif (query != ""):
-                response = chatbot.models.generate_content(
-                    model="gemini-2.5-flash", contents=query)
-                print("response:", response.text)
-                yield session.call("rie.dialogue.say", response.text)
+            elif query != "":
+                response_text = ask_llm(query)
+                print("response:", response_text)
+                yield session.call("rie.dialogue.say", text=response_text)
             else:
                 yield session.call("rie.dialogue.say", text="sorry, I couldn't hear you")
             finish_dialogue = False
@@ -81,9 +97,9 @@ def main(session, details):
         yield sleep(0.5)
 
     yield session.call("rie.dialogue.stt.close")
-
-    yield session.call("rom.optional.behavior.play",name="BlocklyCrouch")
+    yield session.call("rom.optional.behavior.play", name="BlocklyCrouch")
     session.leave()
+
 
 wamp = Component(
     transports=[{
