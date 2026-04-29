@@ -16,7 +16,7 @@ SYSTEM_PROMPT = (
 
 
 # export OPENAI_API_KEY="API_KEY"
-chatbot = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+chatbot = OpenAI(api_key="pHxspF6gJUalnoN4VyHEbJsAxzggyypPCxzQbT3BlbkFJA8VuF35dEKQt9vW6smkuZle_xcfoDVUIkxjNJEhFISdyL3crZOKFMwWDnRhyPGPOaVwpLdEgMA")
 
 
 def ask_llm(user_text: str) -> str:
@@ -107,7 +107,7 @@ wamp = Component(
         "serializers": ["msgpack"],
         "max_retries": 0
     }],
-    realm="rie.69ea1a3a26d8af16808252ab",  # !!!!!!! Check this in case of failure to connect!!!!!!
+    realm="rie.69f209e026d8af16808276fd",  # !!!!!!! Check this in case of failure to connect!!!!!!
 )
 
 wamp.on_join(main)
