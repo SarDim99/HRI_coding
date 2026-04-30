@@ -9,14 +9,15 @@ MODEL_NAME = "gpt-4o-mini"
 
 # Tells the model how to behave
 SYSTEM_PROMPT = (
-    "You are a friendly social robot talking to a person out loud."
+    "You are a friendly social robot talking (youre name is alphi)to a child with developmental language disorder and talking out loud."
     "Keep replies relatively short and easy to listen to. "
     "Avoid markdown, lists, or emoji."
+    "You need to get to know the child, after it has told you his/her name, ask about simple things, such as favourite animal, favourite color"
 )
 
 
 # export OPENAI_API_KEY="API_KEY"
-chatbot = OpenAI(api_key="pHxspF6gJUalnoN4VyHEbJsAxzggyypPCxzQbT3BlbkFJA8VuF35dEKQt9vW6smkuZle_xcfoDVUIkxjNJEhFISdyL3crZOKFMwWDnRhyPGPOaVwpLdEgMA")
+chatbot = OpenAI(api_key="")
 
 
 def ask_llm(user_text: str) -> str:
@@ -66,9 +67,8 @@ def main(session, details):
     yield session.call("rom.optional.behavior.play", name="BlocklyStand")
 
     # Greet prompt
-    yield session.call("rie.dialogue.say", text="Hello there! It's nice to see you.")
+    yield session.call("rie.dialogue.say", text="Hello there, I'm Alphi! It's nice to see you.")
     yield sleep(1)
-    yield session.call("rie.dialogue.say", text="You can start a conversation with me whenever you're ready.")
 
     # Speech recognition (Not sure it works)
     yield session.subscribe(asr, "rie.dialogue.stt.stream")
