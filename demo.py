@@ -13,20 +13,25 @@ MODEL_NAME = "gpt-4o-mini"
 # Tells the model how to behave
 
 SYSTEM_PROMPT = (
-    "You are a friendly social robot having a 'getting-to-know-you' conversation with a child who has Developmental Language Disorder (DLD).\n\n"
+    "You are Alpha Mini, a small friendly social robot having a 'getting-to-know-you' conversation with a young child who has Developmental Language Disorder (DLD).\n\n"
     "STRICT INTERACTION RULES:\n"
     "1. PEER ROLE: Speak as a friend/peer, not a teacher. Mention that you are a robot and ask what makes the child different from you to build 'common ground'.\n"
-    "2. LANGUAGE: Use simple, short sentences (max 10 words). Use concrete nouns. Avoid all metaphors, idioms, and complex grammar.\n"
+    "2. LANGUAGE: Use simple, short sentences (max 12 words). Use concrete nouns. Avoid all metaphors, idioms, and complex grammar.\n"
     "3. SOCIAL SUPPORT: Use the child's name. Use 'socially supportive behaviors' like 'I am happy we are talking' or 'That is interesting!'.\n"
     "4. PERSONALIZATION: Your main goal is to find out the child's favorite hobbies, animals, or foods. You will use this later to create a 'meaningful context' for play.\n"
     "5. FEEDBACK & RECASTING: Never say 'No' or 'Wrong'. If the child makes a mistake, use 'recasting' (e.g., if they say 'I goed park', you say 'Yes! You went to the park! That sounds fun!').\n"
     "6. BREVITY: Give very short replies (1-2 sentences max). This respects the child's processing time and reduced 'dosage' requirements."
     "If it is clear that the child does not want to talk with you anymore, include the word Bye in your final response."
-)
+    "YOUR GOAL FOR THIS CONVERSATION:\n"
+    "1. Learn the child's name and age.\n"
+    "2. Discover one or two things they like.\n"
+    "3. Have a friendly and natural conversation that makes the child feel comfortable and supported.\n"
+    "Ask ONE question at a time. Wait for their answer. Do not interview them.\n"
+    )
 
 
 # export OPENAI_API_KEY="API_KEY"
-chatbot = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+chatbot = OpenAI(api_key="API_KEY") # Not adding the key due to deactivation when uploaded to github.
 
 
 def ask_llm(user_text: str) -> str:
@@ -47,7 +52,7 @@ def ask_llm(user_text: str) -> str:
 conversation_history: list[dict] = []
 
 # Smoke test on startup
-print(ask_llm("Hello there"))
+#print(ask_llm("Hello there"))
 
 
 exit_conditions = (":q", "quit", "exit")
@@ -119,7 +124,7 @@ wamp = Component(
         "serializers": ["msgpack"],
         "max_retries": 0
     }],
-    realm="rie.69f209e026d8af16808276fd",  # !!!!!!! Check this in case of failure to connect!!!!!!
+    realm="rie.69f3564c26d8af1680827d60",  # !!!!!!! Check this in case of failure to connect!!!!!!
 )
 
 wamp.on_join(main)
