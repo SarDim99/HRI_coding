@@ -31,7 +31,7 @@ SYSTEM_PROMPT = (
 
 
 # export OPENAI_API_KEY="API_KEY"
-chatbot = OpenAI(api_key="API_KEY") # Not adding the key due to deactivation when uploaded to github.
+chatbot = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) # Not adding the key due to deactivation when uploaded to github.
 
 
 def ask_llm(user_text: str) -> str:
