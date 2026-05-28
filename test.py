@@ -9,17 +9,21 @@ load_dotenv()
 
 MODEL_NAME = "gpt-4o-mini"
 
+# Couldnt make the robot work outside of the lab and inside of the lab too much noice to test. Maybe We can test it in a less busy day.
+
+# Testing different prompts for different stages of the convestation. 
+
 # General instructions that always apply to the robot
 ROLE_PROMPT = (
-    "You are Alpha Mini, a small friendly social robot having a conversation "
+    "You are Alpha Mini, a small friendly social robot having a friendly conversation "
     "with a young child who has Developmental Language Disorder (DLD).\n\n"
     "STRICT INTERACTION RULES:\n"
     "1. PEER ROLE: Speak as a friend/peer, not a teacher. You are a robot and "
     "may ask what makes the child different from you to build 'common ground'.\n"
     "2. LANGUAGE: Use simple, short sentences (max 12 words). Use concrete nouns. "
     "Avoid all metaphors, idioms, and complex grammar.\n"
-    "3. SOCIAL SUPPORT: Use the child's name once you know it. Use 'socially "
-    "supportive behaviors' like 'I am happy we are talking' or 'That is interesting!'.\n"
+    "3. SOCIAL SUPPORT: Use the child's name once you know it but do not overuse it. Use 'socially "
+    "supportive behaviors' like 'I am happy we are talking' or 'That is interesting!' but again do not overuse it.\n"
     "4. FEEDBACK & RECASTING: Never say 'No' or 'Wrong'. If the child makes a mistake, "
     "use 'recasting' (e.g., if they say 'I goed park', you say 'Yes! You went to the park! "
     "That sounds fun!').\n"
@@ -68,13 +72,17 @@ GAME_PROMPT = (
     "ENDING: If the child loses interest or wants to stop, say 'That was fun! Thanks for "
     "playing with me [child's name]! I had a great time! See you again next time!' and "
     "include 'Bye' in your final response.\n\n"
-    "AFTER THE GAME: Have a short, light conversation about how they liked the game."
+    "AFTER THE GAME: Try to initiate a short, light conversation about how they liked the game. If the child doen't want to talk, " 
+    "end the conversation and include 'Bye' in your final response. \n\n"
 )
 
 
-# Sould we use different prompts or a big one? 
-# One Master proomt with the robots rules and general behavior
-# Then different prompts for the different stages (Intro, Game, Outro etc) 
+# Movements performed by the robot and picked by the LLM (NEED TO ADD THIS)
+MOVEMENTS = {
+    "Hello": "BlocklyWaveRightArm",
+    "Bye": "BlocklyWaveRightArm",
+    "Think": "BlocklyTouchHead",
+}
 
 
 # export OPENAI_API_KEY="API_KEY"
@@ -143,9 +151,9 @@ def main(session, details):
     yield session.call("rom.optional.behavior.play", name="BlocklyStand")
 
     # Greet prompt
-    yield session.call("rie.dialogue.say", text="Hello there! It's nice to see you.")
-    yield sleep(1)
-    yield session.call("rie.dialogue.say", text="You can start a conversation with me whenever you're ready.")
+    yield session.call("rie.dialogue.say", text="Hello there! I'm Alpha Mini. It's nice to see you!")
+    #yield sleep(1)
+    #yield session.call("rie.dialogue.say", text="You can start a conversation with me whenever you're ready.")
 
     # Speech recognition
     yield session.subscribe(asr, "rie.dialogue.stt.stream")
@@ -186,7 +194,7 @@ wamp = Component(
         "serializers": ["msgpack"],
         "max_retries": 0
     }],
-    realm="rie.69f3564c26d8af1680827d60",  # !!!!!!! Check this in case of failure to connect!!!!!!
+    realm="rie.6a1820e2f2a08d602afbc30d",  # !!!!!!! Check this in case of failure to connect!!!!!!
 )
 
 wamp.on_join(main)
