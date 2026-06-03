@@ -53,21 +53,30 @@ INTRO_PROMPT = (
     "Do NOT include [GAME_START] before the child has agreed to play."
 )
 
+
+
+# Game start only when kid talks again so we need to fix it 
+# Give the first clue right away
+# Game explanation??? 
+
+
+
+# TODO: Personalization into a json for game and mahybe something else 
+
+
 # Instructions for the game phase
 GAME_PROMPT = (
     "CURRENT PHASE: GUESSING GAME\n"
-    "Using a topic the child likes (from your earlier conversation), play a simple "
+    "Using a topic the with the [child's interest] and play a simple "
     "guessing game.\n\n"
     "HOW THE GAME WORKS:\n"
-    "1. Pick a word related to something the child likes (e.g., if they like animals, "
-    "pick 'dog').\n"
-    "2. Give 3 simple clues, one at a time. Example for 'dog': 'I am a pet.', "
-    "'I have four legs.', 'I like to bark.'\n"
+    "1. Pick a word related to something the child likes \n"
+    "2. Give 3 simple clues, one at a time.\n"
     "3. After each clue, wait for the child to guess.\n"
     "4. If they guess correctly: say 'That's right! You guessed it!' and start a new round.\n"
     "5. If they don't guess after 3 clues: say 'Good try! It was a difficult one really! "
     "Do you want to try another one?' and start a new round.\n\n"
-    "ROUNDS: Play at least 2 rounds, but no more than 4, to keep the child engaged "
+    "ROUNDS: Play at least 2 rounds, but no more than 4, to keep the child engaged"
     "without overwhelming them.\n\n"
     "ENDING: If the child loses interest or wants to stop, say 'That was fun! Thanks for "
     "playing with me [child's name]! I had a great time! See you again next time!' and "
@@ -76,13 +85,6 @@ GAME_PROMPT = (
     "end the conversation and include 'Bye' in your final response. \n\n"
 )
 
-
-# Movements performed by the robot and picked by the LLM (NEED TO ADD THIS)
-MOVEMENTS = {
-    "Hello": "BlocklyWaveRightArm",
-    "Bye": "BlocklyWaveRightArm",
-    "Think": "BlocklyTouchHead",
-}
 
 
 # export OPENAI_API_KEY="API_KEY"
@@ -152,8 +154,8 @@ def main(session, details):
 
     # Greet prompt
     yield session.call("rie.dialogue.say", text="Hello there! I'm Alpha Mini. It's nice to see you!")
-    #yield sleep(1)
-    #yield session.call("rie.dialogue.say", text="You can start a conversation with me whenever you're ready.")
+    yield sleep(1)
+    yield session.call("rie.dialogue.say", text="You can start a conversation with me whenever you're ready.")
 
     # Speech recognition
     yield session.subscribe(asr, "rie.dialogue.stt.stream")
@@ -194,7 +196,7 @@ wamp = Component(
         "serializers": ["msgpack"],
         "max_retries": 0
     }],
-    realm="rie.6a1820e2f2a08d602afbc30d",  # !!!!!!! Check this in case of failure to connect!!!!!!
+    realm="rie.6a1d55bb8a2cba4f82b84484",  # !!!!!!! Check this in case of failure to connect!!!!!!
 )
 
 wamp.on_join(main)
