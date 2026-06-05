@@ -1,8 +1,10 @@
 from autobahn.twisted.component import Component, run
 from twisted.internet.defer import inlineCallbacks
+from alpha_mini_rug import perform_movement
 from autobahn.twisted.util import sleep
 from openai import OpenAI
 import os
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,8 +31,10 @@ ROLE_PROMPT = (
     "That sounds fun!').\n"
     "5. BREVITY: Give very short replies (1-2 sentences max). This respects the child's "
     "processing time and reduced 'dosage' requirements.\n"
-    "6. ONE QUESTION AT A TIME: Ask one question, wait for the answer. Do not interview.\n"
-    "7. ENDING: If it is clear the child does not want to talk anymore, include the word "
+    "6. ENGAGEMENT: Perform a fitting body movement with each response. The available "
+    "movements and the required output format are described under OUTPUT FORMAT.\n"
+    "7. ONE QUESTION AT A TIME: Ask one question, wait for the answer. Do not interview.\n"
+    "8. ENDING: If it is clear the child does not want to talk anymore, include the word "
     "'Bye' in your final response."
 )
 
@@ -49,25 +53,80 @@ INTRO_PROMPT = (
     "Once you know the child's name AND at least one thing they like, suggest "
     "playing a guessing game (e.g., 'I know a fun game we can play! Want to try?'). "
     "If the child agrees to play, append the marker [GAME_START] at the very end "
-    "of that reply. The marker will be hidden from the child.\n"
+    "of the \"text\" field. The marker will be hidden from the child.\n"
     "Do NOT include [GAME_START] before the child has agreed to play."
 )
+
+
+ANIMATION_PROMPT = (
+    "OUTPUT FORMAT (ALWAYS):\n"
+    "Reply with ONE JSON object and nothing else, no markdown:\n"
+    '{"text": "the words you say out loud", "animation": "<name>"}\n'
+    "\"animation\" must be EXACTLY one of: wave, yes, no, applause, think, "
+    "shrug, bow, celebrate, none.\n"
+    "Pick a movement whenever one fits; use \"none\" only if nothing fits.\n"
+    "When to use each:\n"
+    "- wave: greeting the child or saying goodbye\n"
+    "- yes: nodding to agree or confirm\n"
+    "- no: a playful head shake during the game only, never as feedback on the child\n"
+    "- applause: celebrating a correct guess or praising the child\n"
+    "- think: thinking, or while giving a clue\n"
+    "- shrug: saying 'good try' or being unsure\n"
+    "- bow: thanking the child or ending the conversation\n"
+    "- celebrate: a short happy celebration\n"
+    "Never write the animation name or any JSON inside \"text\"; \"text\" is only spoken words."
+)
+
+# Maps an animation keyword to a pre-built behavior
+ANIM_BEHAVIORS = {
+    "wave": "BlocklyWaveRightArm",
+    "applause": "BlocklyApplause",
+    "think": "BlocklyTouchHead",
+    "shrug": "BlocklyShrug",
+    "bow": "BlocklyBow",
+    "celebrate": "BlocklyDab",
+}
+
+# Custom head-motor keyframes for nodding yes
+NOD_FRAMES = [
+    {"time": 400, "data": {"body.head.pitch": 0.1}},
+    {"time": 1200, "data": {"body.head.pitch": -0.1}},
+    {"time": 2000, "data": {"body.head.pitch": 0.1}},
+    {"time": 2400, "data": {"body.head.pitch": 0.0}},
+]
+
+# Custom head-motor keyframes for shaking no
+SHAKE_FRAMES = [
+    {"time": 400, "data": {"body.head.yaw": 0.3}},
+    {"time": 1000, "data": {"body.head.yaw": -0.3}},
+    {"time": 1600, "data": {"body.head.yaw": 0.3}},
+    {"time": 2200, "data": {"body.head.yaw": 0.0}},
+]
+
+
+
+# Game start only when kid talks again so we need to fix it 
+# Give the first clue right away
+# Game explanation??? 
+
+
+
+# TODO: Personalization into a json for game and mahybe something else 
+
 
 # Instructions for the game phase
 GAME_PROMPT = (
     "CURRENT PHASE: GUESSING GAME\n"
-    "Using a topic the child likes (from your earlier conversation), play a simple "
+    "Using a topic the with the [child's interest] and play a simple "
     "guessing game.\n\n"
     "HOW THE GAME WORKS:\n"
-    "1. Pick a word related to something the child likes (e.g., if they like animals, "
-    "pick 'dog').\n"
-    "2. Give 3 simple clues, one at a time. Example for 'dog': 'I am a pet.', "
-    "'I have four legs.', 'I like to bark.'\n"
+    "1. Pick a word related to something the child likes \n"
+    "2. Give 3 simple clues, one at a time.\n"
     "3. After each clue, wait for the child to guess.\n"
     "4. If they guess correctly: say 'That's right! You guessed it!' and start a new round.\n"
     "5. If they don't guess after 3 clues: say 'Good try! It was a difficult one really! "
     "Do you want to try another one?' and start a new round.\n\n"
-    "ROUNDS: Play at least 2 rounds, but no more than 4, to keep the child engaged "
+    "ROUNDS: Play at least 2 rounds, but no more than 4, to keep the child engaged"
     "without overwhelming them.\n\n"
     "ENDING: If the child loses interest or wants to stop, say 'That was fun! Thanks for "
     "playing with me [child's name]! I had a great time! See you again next time!' and "
@@ -76,13 +135,6 @@ GAME_PROMPT = (
     "end the conversation and include 'Bye' in your final response. \n\n"
 )
 
-
-# Movements performed by the robot and picked by the LLM (NEED TO ADD THIS)
-MOVEMENTS = {
-    "Hello": "BlocklyWaveRightArm",
-    "Bye": "BlocklyWaveRightArm",
-    "Think": "BlocklyTouchHead",
-}
 
 
 # export OPENAI_API_KEY="API_KEY"
@@ -93,21 +145,45 @@ current_phase = "intro"
 GAME_START_MARKER = "[GAME_START]"
 
 
-def ask_llm(user_text: str) -> str:
+def start_animation(session, anim):
+    if not anim or anim == "none":
+        return None
+    if anim == "yes":
+        return perform_movement(session, frames=NOD_FRAMES, force=True)
+    if anim == "no":
+        return perform_movement(session, frames=SHAKE_FRAMES, force=True)
+    behavior_name = ANIM_BEHAVIORS.get(anim)
+    if behavior_name is None:
+        return None
+    return session.call("rom.optional.behavior.play", name=behavior_name)
+
+
+def ask_llm(user_text: str):
     global current_phase
 
     conversation_history.append({"role": "user", "content": user_text})
 
     if current_phase == "intro":
-        system_message = ROLE_PROMPT + "\n\n" + INTRO_PROMPT
+        system_message = ROLE_PROMPT + "\n\n" + INTRO_PROMPT + "\n\n" + ANIMATION_PROMPT
     else:
-        system_message = ROLE_PROMPT + "\n\n" + GAME_PROMPT
+        system_message = ROLE_PROMPT + "\n\n" + GAME_PROMPT + "\n\n" + ANIMATION_PROMPT
 
     response = chatbot.chat.completions.create(
         model=MODEL_NAME,
         messages=[{"role": "system", "content": system_message}] + conversation_history,
+        response_format={"type": "json_object"},
     )
-    reply = response.choices[0].message.content.strip()
+
+    raw = response.choices[0].message.content
+
+    # The model returns {"text": ..., "animation": ...}
+    try:
+        data = json.loads(raw)
+        reply = (data.get("text") or "").strip()
+        anim = (data.get("animation") or "none").strip().lower()
+    except (json.JSONDecodeError, TypeError):
+        reply = (raw or "").strip()
+        anim = "none"
 
     # Detect phase transition and strip the marker before the robot speaks it
     if current_phase == "intro" and GAME_START_MARKER in reply:
@@ -116,7 +192,7 @@ def ask_llm(user_text: str) -> str:
         print("[Phase changed: intro -> game]")
 
     conversation_history.append({"role": "assistant", "content": reply})
-    return reply
+    return reply, anim
 
 
 conversation_history: list[dict] = []
@@ -150,11 +226,12 @@ def main(session, details):
     # robot stand up
     yield session.call("rom.optional.behavior.play", name="BlocklyStand")
 
-    # Greet prompt
-    yield session.call("rie.dialogue.say", text="Hello there! I'm Alpha Mini. It's nice to see you!")
-    #yield sleep(1)
-    #yield session.call("rie.dialogue.say", text="You can start a conversation with me whenever you're ready.")
+    yield session.call("rie.vision.face.find", timeout=10000)
 
+    # Greet prompt
+    session.call("rom.optional.behavior.play", name="BlocklyHello")
+    yield session.call("rie.dialogue.say", text="Hello there! I'm Alpha Mini. It's nice to see you!")
+    
     # Speech recognition
     yield session.subscribe(asr, "rie.dialogue.stt.stream")
     yield session.call("rie.dialogue.stt.stream")
@@ -173,11 +250,12 @@ def main(session, details):
                 yield session.call("rie.dialogue.say", text="Goodbye! It was nice talking with you. See you again next time.")
                 break
             elif query != "":
-                response_text = ask_llm(query)
-                print("response:", response_text)
+                response_text, anim = ask_llm(query)
+                start_animation(session, anim=anim)
+                print("response:", response_text, "| anim:", anim)
                 yield session.call("rie.dialogue.say", text=response_text)
             else:
-                yield session.call("rie.dialogue.say", text="sorry, I couldn't hear you")
+                yield session.call("rie.dialogue.say", text="Sorry, I couldn't hear you")
             finish_dialogue = False
             query = ""
             yield session.call("rie.dialogue.stt.stream")
@@ -194,7 +272,7 @@ wamp = Component(
         "serializers": ["msgpack"],
         "max_retries": 0
     }],
-    realm="rie.6a1820e2f2a08d602afbc30d",  # !!!!!!! Check this in case of failure to connect!!!!!!
+    realm="rie.6a22750a8a2cba4f82b85cf7",  # !!!!!!! Check this in case of failure to connect!!!!!!
 )
 
 wamp.on_join(main)
