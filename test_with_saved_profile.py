@@ -25,7 +25,7 @@ ROLE_PROMPT = (
     "4. FEEDBACK & RECASTING: Never say 'No' or 'Wrong'. If the child makes a mistake, "
     "use 'recasting' (e.g., if they say 'I goed park', you say 'Yes! You went to the park! "
     "That sounds fun!').\n"
-    "5. BREVITY: Give very short replies (1-2 sentences max). This respects the child's "
+    "5. BREVITY: Give very short replies (1-3 sentences max). This respects the child's "
     "processing time and reduced 'dosage' requirements.\n"
     "6. ONE QUESTION AT A TIME: Ask one question, wait for the answer. Do not interview.\n"
     "7. ENDING: If it is clear the child does not want to talk anymore, include the word "
@@ -57,19 +57,19 @@ else:
         "YOUR GOALS FOR THIS PHASE:\n"
         "1. Learn the child's name and age.\n"
         "2. Discover one or two things they like (hobbies, animals, foods, etc.).\n"
+        "CRITICAL TRACKING FLAG:\n"
+        "Every single time you learn something new about the child (even if it is JUST their name), you must append the tracking tag to the end of your text.\n"
+        "Do not wait to collect everything. THis tag is invisible to the child and does not count toward your 1-2 sentence brevity limit.\n"
+        "Use 'unknown' for any pieces of information you do not know yet.\n"
+        "Format: [SAVE_PROFILE|name|age|likes]\n"
+        "Example 1 (only know name): 'Nice to meet you, David! [SAVE_PROFILE|David|unknown|unknown]'\n"
+        "Example 2 (now you found out age): 'Wow, 8 is a great age! [SAVE_PROFILE|David|8|unknown]'\n"
         "3. Have a friendly and natural conversation that makes the child feel comfortable.\n\n"
         "TRANSITION TO GAME:\n"
         "Once you know the child's name AND at least one thing they like, suggest "
         "playing a guessing game (e.g., 'I know a fun game we can play! Want to try?'). "
         "If the child agrees to play, append the marker [GAME_START] at the very end "
         "of that reply.\n\n"
-        "CRITICAL TRACKING FLAG:\n"
-        "Every time you learn something new about the child (their name, age, OR a hobby), "
-        "you MUST append the tracking flag to the absolute end of your response.\n"
-        "Use 'unknown' for any pieces of information you do not know yet.\n"
-        "Format: [SAVE_PROFILE|name|age|likes]\n"
-        "Example 1 (only know name): 'Nice to meet you, David! [SAVE_PROFILE|David|unknown|unknown]'\n"
-        "Example 2 (now you found out age): 'Wow, 8 is a great age! [SAVE_PROFILE|David|8|unknown]'\n"
         
     )
 
@@ -209,7 +209,7 @@ wamp = Component(
         "serializers": ["msgpack"],
         "max_retries": 0
     }],
-    realm="rie.6a2025ac8a2cba4f82b851c2",
+    realm="rie.6a2281b48a2cba4f82b85d46",
 )
 
 wamp.on_join(main)
