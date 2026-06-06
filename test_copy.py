@@ -158,7 +158,7 @@ def main(session, details):
 
     # Greet prompt
     yield session.call("rie.dialogue.say", text="Hello there! I'm Alpha Mini. It's nice to see you!")
-    yield session.call("rom.optional.behavior.play", name="BlocklyHello")
+    yield session.call("rom.optional.behavior.play", name="BlocklyWaveRightArm")
     #yield sleep(1)
     #yield session.call("rie.dialogue.say", text="You can start a conversation with me whenever you're ready.")
 
@@ -168,11 +168,13 @@ def main(session, details):
 
     # loop until the user says exit or quit
     dialogue = True
+    # yield session.call("rie.vision.face.find")
+
     while dialogue:
-        yield session.call("rie.vision.face.find")
-        yield session.call("rie.vision.face.track")
+        
+        session.call("rie.vision.face.track")
         if SUCCEED_MARKER in response_text:
-            yield session.call("rom.optional.behavior.play", name="BlocklySucceed")
+            yield session.call("rom.optional.behavior.play", name="BlocklyDab")
         elif APPLOUSE_MARKER in response_text:
             yield session.call("rom.optional.behavior.play", name="BlocklyApplause")
 
@@ -185,7 +187,7 @@ def main(session, details):
             if query in exit_conditions:
                 dialogue = False
                 yield session.call("rie.dialogue.say", text="Goodbye! It was nice talking with you. See you again next time.")
-                yield session.call("rom.optional.behavior.play", name="BlocklyHello")
+                yield session.call("rom.optional.behavior.play", name="BlocklyWaveRightArm")
                 break
             elif query != "":
                 response_text = ask_llm(query)
@@ -209,7 +211,7 @@ wamp = Component(
         "serializers": ["msgpack"],
         "max_retries": 0
     }],
-    realm="rie.6a2025ac8a2cba4f82b851c2",  # !!!!!!! Check this in case of failure to connect!!!!!!
+    realm="rie.6a22750a8a2cba4f82b85cf7",  # !!!!!!! Check this in case of failure to connect!!!!!!
 )
 
 wamp.on_join(main)
