@@ -3,18 +3,28 @@ from twisted.internet.defer import inlineCallbacks
 from alpha_mini_rug import perform_movement
 from autobahn.twisted.util import sleep
 from openai import OpenAI
+from mistralai.client import Mistral
+from pathlib import Path
+import base64
 import os
 import json
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# I tried to make the code more readable and structured but
+# i think it needs more polishing
+
+# ================= MODELS and APIs =================
+MISTRAL_MODEL_NAME = "voxtral-mini-tts-2603"
 MODEL_NAME = "gpt-4o-mini"
 
-# Couldnt make the robot work outside of the lab and inside of the lab too much noice to test. Maybe We can test it in a less busy day.
+chatbot = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) # Not adding the key due to deactivation when uploaded to github.
+voicebot = Mistral(api_key=os.getenv("MISTRAL_TTS_KEY"))
 
-# Testing different prompts for different stages of the convestation. 
 
+
+# ================= MASTER PROMPTS =================
 # General instructions that always apply to the robot
 ROLE_PROMPT = (
     "You are Alpha Mini, a small friendly social robot having a friendly conversation "
@@ -57,7 +67,28 @@ INTRO_PROMPT = (
     "Do NOT include [GAME_START] before the child has agreed to play."
 )
 
+# Instructions for the game phase
+GAME_PROMPT = (
+    "CURRENT PHASE: GUESSING GAME\n"
+    "Using a topic the with the [child's interest] and play a simple "
+    "guessing game.\n\n"
+    "HOW THE GAME WORKS:\n"
+    "1. Pick a word related to something the child likes but not the thing that it likes. \n"
+    "2. Give 3 simple clues, one at a time.\n"
+    "3. After each clue, wait for the child to guess.\n"
+    "4. If they guess correctly: say 'That's right! You guessed it!' and start a new round.\n"
+    "5. If they don't guess after 3 clues: say 'Good try! It was a difficult one really! "
+    "Do you want to try another one?' and start a new round.\n\n"
+    "ROUNDS: Play at least 2 rounds, but no more than 4, to keep the child engaged"
+    "without overwhelming them.\n\n"
+    "ENDING: If the child loses interest or wants to stop, say 'That was fun! Thanks for "
+    "playing with me [child's name]! I had a great time! See you again next time!' and "
+    "include 'Bye' in your final response.\n\n"
+    "AFTER THE GAME: Try to initiate a short, light conversation about how they liked the game. If the child doen't want to talk, " 
+    "end the conversation and include 'Bye' in your final response. \n\n"
+)
 
+# Prompt for choosing the animation
 ANIMATION_PROMPT = (
     "OUTPUT FORMAT (ALWAYS):\n"
     "Reply with ONE JSON object and nothing else, no markdown:\n"
@@ -77,6 +108,8 @@ ANIMATION_PROMPT = (
     "Never write the animation name or any JSON inside \"text\"; \"text\" is only spoken words."
 )
 
+
+# ================= ANIMATIONS =================
 # Maps an animation keyword to a pre-built behavior
 ANIM_BEHAVIORS = {
     "wave": "BlocklyWaveRightArm",
@@ -87,6 +120,7 @@ ANIM_BEHAVIORS = {
     "celebrate": "BlocklyDab",
 }
 
+# Check why the LLM doent choose these
 # Custom head-motor keyframes for nodding yes
 NOD_FRAMES = [
     {"time": 400, "data": {"body.head.pitch": 0.1}},
@@ -105,40 +139,141 @@ SHAKE_FRAMES = [
 
 
 
-# Game start only when kid talks again so we need to fix it 
-# Give the first clue right away
-# Game explanation??? 
+# ================= START GAME CODE =================
+MIN_ROUNDS = 2
+MAX_ROUNDS = 4
+
+game_state = {
+    "active": False, 
+    "round": 0,
+    "target": None,
+    "clues": [],
+    "clue_index": 0,
+    "used": [],
+}
 
 
-
-# TODO: Personalization into a json for game and mahybe something else 
-
-
-# Instructions for the game phase
-GAME_PROMPT = (
-    "CURRENT PHASE: GUESSING GAME\n"
-    "Using a topic the with the [child's interest] and play a simple "
-    "guessing game.\n\n"
-    "HOW THE GAME WORKS:\n"
-    "1. Pick a word related to something the child likes \n"
-    "2. Give 3 simple clues, one at a time.\n"
-    "3. After each clue, wait for the child to guess.\n"
-    "4. If they guess correctly: say 'That's right! You guessed it!' and start a new round.\n"
-    "5. If they don't guess after 3 clues: say 'Good try! It was a difficult one really! "
-    "Do you want to try another one?' and start a new round.\n\n"
-    "ROUNDS: Play at least 2 rounds, but no more than 4, to keep the child engaged"
-    "without overwhelming them.\n\n"
-    "ENDING: If the child loses interest or wants to stop, say 'That was fun! Thanks for "
-    "playing with me [child's name]! I had a great time! See you again next time!' and "
-    "include 'Bye' in your final response.\n\n"
-    "AFTER THE GAME: Try to initiate a short, light conversation about how they liked the game. If the child doen't want to talk, " 
-    "end the conversation and include 'Bye' in your final response. \n\n"
+# Seperating the game prompt for better structure by the LLM
+ROUND_SETUP_PROMPT = (
+    "Design ONE round of a word-guessing game for a child with DLD \n"
+    "Pick a TARGET word in the same category as something the child likes, "
+    "but NOT a word the child has already said.\n"
+    "Write exactly 3 clues as a cueing hierarchy, broad to specific: \n"
+    "Clue 1: general semantic clue (what kind of thing it is)\n"
+    "Clue 2: a specific feature (what it does / where you find it)\n"
+    "Clue 3: a phonemic cue (the first sound, e.g. \"It starts with /k/\")\n"
+    "Each clue max 12 words, simple and concrete language.\n"
+    "Reply with ONE JSON object and nothing else:\n"
+    '{"target": "<word>", "clues": ["<clue 1>", "<clue 2>", "<clue 3>"]}'
 )
 
+JUDJE_PROMPT = (
+    "You judge a child's guess in a word game. The target is: \"{target}\".\n"
+    "Classify the child's message as exacty ine of: \n"
+    "\"correct\" - they named the target (Allow synonyms or very close approximations)\n"
+    "\"incorrect\" - a wrong guess or any unrelated talk \n"
+    "\"stop\" - they want to stop or are losing interest \n"
+    'Reply with ONE JSON object: {"verdict": "correct|incorrect|stop"}'
+)
+
+# Picking a word and clues
+def generate_round():
+    avoid = ",".join(game_state["used"]) or "none"
+    system_message = (
+        ROLE_PROMPT + "\n\n" + ROUND_SETUP_PROMPT + "\n\n Already used, do not reuse: " + avoid
+    )
+    response = chatbot.chat.completions.create(
+        model = MODEL_NAME,
+        messages=[{"role": "system", "content": system_message}] + conversation_history,    
+        response_format={"type": "json_object"},
+    )
+    data = json.loads(response.choices[0].message.content)
+    return data["target"].strip(), [c.strip() for c in data["clues"]][:3]
+
+# Chekcing if the guess is correct
+def judge_answer(child_text, target):
+    response = chatbot.chat.completions.create(
+        model = MODEL_NAME,
+        messages=[
+            {"role": "system", "content": JUDJE_PROMPT.format(target=target)}, 
+            {"role": "user", "content": child_text},
+        ],
+        response_format={"type": "json_object"},
+    )
+    return json.loads(response.choices[0].message.content).get("verdict", "incorrect")
+
+# Round start/reset for better game handling 
+def start_round(lead_in=""):
+    target, clues = generate_round()
+    game_state["active"] = True
+    game_state["round"] += 1
+    game_state["target"] = target
+    game_state["clues"] = clues
+    game_state["clue_index"] = 1 # Becasue of first clue
+    game_state["used"].append(target)
+    return (lead_in + " " + clues[0]).strip(), "think"
+
+def end_game(text, anim):
+    game_state["active"] = False
+    return text + "Bye!", anim
+
+# Handling the whole game so the LLM doent get lost buy the clues or the words 
+def handling_game(user_text):
+    if not game_state["active"]:
+        return start_round("Okay, let's play the game! Here is your first clue:")
+    
+    verdict = judge_answer(user_text, game_state["target"])
+
+    if verdict == "stop":
+        return end_game("WOW that was really fun! Thanks for playing with me!", "bow")
+    
+    if verdict == "correct":
+        if game_state["round"] >= MAX_ROUNDS:
+            return end_game("That's right! You guessed the correct word! You are really good at this game! Thanks for playing with me!", "celebrate")
+        return start_round(lead_in="That's right you guessed it! Here is a new word:")[0], "applause"
+
+    if game_state["clue_index"] < len(game_state["clues"]):
+        clue = game_state["clues"][game_state["clue_index"]]
+        game_state["clue_index"] += 1
+        return "Good guess! Here's another clue:" + clue, "think"
+    
+    if game_state["round"] >= MAX_ROUNDS:
+        return end_game("Good try! It was a difficult one really! Thanks for playing with me!", "applause")
+    
+    return start_round(lead_in="Good guess! That was a tough one. Here's another word: ")[0], "shrug"
 
 
-# export OPENAI_API_KEY="API_KEY"
-chatbot = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) # Not adding the key due to deactivation when uploaded to github.
+# TTS for changing voice
+def changed_voice(text):
+    response = voicebot.audio.speech.complete(
+        model=MISTRAL_MODEL_NAME,
+        input=text,
+        voice_id="gb_oliver_excited",
+        response_format="mp3",
+    )
+    Path("/audio/output.mp3").write_bytes(base64.b64decode(response.audio_data))
+
+# Phase handling 
+def handle_intro():
+    system_message = ROLE_PROMPT + "\n\n" + INTRO_PROMPT + "\n\n" + ANIMATION_PROMPT
+    response = chatbot.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[{"role": "system", "content": system_message}] + conversation_history,
+        response_format={"type": "json_object"},
+    )
+    data = json.loads(response.choices[0].message.content)
+    reply = (data.get("text") or "").strip()
+    anim = (data.get("animation") or "none").strip().lower()
+
+    if GAME_START_MARKER in reply:
+        global current_phase
+        reply = reply.replace(GAME_START_MARKER, "").strip()
+        current_phase = "game"
+        clue_text, clue_anim = start_round("Okay, let's start the game then! Here is your first clue.")
+        return (reply + " " + clue_text).strip(), clue_anim
+
+    return reply, anim
+
 
 
 current_phase = "intro"
@@ -157,42 +292,28 @@ def start_animation(session, anim):
         return None
     return session.call("rom.optional.behavior.play", name=behavior_name)
 
-
-def ask_llm(user_text: str):
-    global current_phase
-
-    conversation_history.append({"role": "user", "content": user_text})
-
-    if current_phase == "intro":
-        system_message = ROLE_PROMPT + "\n\n" + INTRO_PROMPT + "\n\n" + ANIMATION_PROMPT
-    else:
-        system_message = ROLE_PROMPT + "\n\n" + GAME_PROMPT + "\n\n" + ANIMATION_PROMPT
-
-    response = chatbot.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[{"role": "system", "content": system_message}] + conversation_history,
-        response_format={"type": "json_object"},
+# This might not work because it needs an actual URL
+# There might be another way by converting the mp3 to raw stereo but I dont know how that works
+# I asked an LLM but not a good answer was given. 
+def say(session, text):
+    changed_voice(text)
+    yield session.call(
+        "rom.actuator.audio.stream",
+        url="/audio/output.mp3",
+        sync=True,
     )
 
-    raw = response.choices[0].message.content
 
-    # The model returns {"text": ..., "animation": ...}
-    try:
-        data = json.loads(raw)
-        reply = (data.get("text") or "").strip()
-        anim = (data.get("animation") or "none").strip().lower()
-    except (json.JSONDecodeError, TypeError):
-        reply = (raw or "").strip()
-        anim = "none"
+def ask_llm(user_text: str):
+    conversation_history.append({"role": "user", "content": user_text})
+    if current_phase == "game":
+        text, anim = handling_game(user_text)
+    else:
+        text, anim = handle_intro()
 
-    # Detect phase transition and strip the marker before the robot speaks it
-    if current_phase == "intro" and GAME_START_MARKER in reply:
-        reply = reply.replace(GAME_START_MARKER, "").strip()
-        current_phase = "game"
-        print("[Phase changed: intro -> game]")
-
-    conversation_history.append({"role": "assistant", "content": reply})
-    return reply, anim
+    conversation_history.append({"role": "assistant", "content": text})
+    changed_voice(text)
+    return text, anim
 
 
 conversation_history: list[dict] = []
@@ -222,14 +343,17 @@ def asr(frames):
 def main(session, details):
     global finish_dialogue, query, response_text
 
+    # Set language to English
     yield session.call("rie.dialogue.config.language", lang="en")
     # robot stand up
     yield session.call("rom.optional.behavior.play", name="BlocklyStand")
 
+    #Face detection (Don't think it works)
     yield session.call("rie.vision.face.find", timeout=10000)
+    # Following face implementation (Might not work either)
 
     # Greet prompt
-    session.call("rom.optional.behavior.play", name="BlocklyHello")
+    session.call("rom.optional.behavior.play", name="BlocklyWaveLeftArm")
     yield session.call("rie.dialogue.say", text="Hello there! I'm Alpha Mini. It's nice to see you!")
     
     # Speech recognition
