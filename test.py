@@ -139,7 +139,7 @@ SHAKE_FRAMES = [
 
 
 
-# ================= START GAME CODE =================
+# ================= START GAME CODE (Needs testing)=================
 MIN_ROUNDS = 2
 MAX_ROUNDS = 4
 
