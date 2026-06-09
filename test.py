@@ -306,11 +306,11 @@ def wants_replay(child_text):
     )
     return json.loads(r.choices[0].message.content).get("answer", "no") == "yes"
 
-def ask_replay(lead_in):
+def ask_replay(lead_in, anim="think"):
     global awaiting_replay
     game_state["active"] = False
     awaiting_replay = True
-    return (lead_in + " Do you want to play again?").strip(), "think"
+    return (lead_in + " Do you want to try another word?").strip(), anim
 
 # Picking a word and clues
 def generate_round():
@@ -376,7 +376,7 @@ def handling_game(user_text):
     if verdict == "correct":
         if game_state["round"] >= MAX_ROUNDS:
             return end_game("That's right! You guessed the correct word! You are really good at this game! Thanks for playing with me!", "celebrate")
-        return start_round(lead_in="That's right you guessed it! Here is a new word:")[0], "applause"
+        return ask_replay(f"That's right! You guessed it!", "celebrate")
 
     if game_state["clue_index"] < len(game_state["clues"]):
         clue = game_state["clues"][game_state["clue_index"]]
@@ -385,8 +385,8 @@ def handling_game(user_text):
     
     answer = game_state["target"]
     if game_state["round"] >= MAX_ROUNDS:
-        return ask_replay(f"That was a tricky one! The word was {answer}.")
-    return start_round(lead_in=f"Tricky one! The word was {answer}. Let's try a new word: ")[0], "shrug"
+        return ask_replay(f"That was tricky! The word was {answer}.", "shrug")
+    return ask_replay(f"That was tricky! The word was {answer}.", "shrug")
     
 
 # Phase handling 
@@ -465,8 +465,7 @@ def ask_llm(user_text: str):
     if awaiting_replay:
         awaiting_replay = False
         if wants_replay(user_text):
-            game_state["round"] = 0   # fresh game
-            text, anim = start_round("Yay! Let's play again. Here is your first clue:")
+            text, anim = start_round("Yay! Here is your next word:")
         else:
             text, anim = "Okay! That was so much fun. Bye!", "bow"
         conversation_history.append({"role": "assistant", "content": text})
@@ -552,11 +551,11 @@ def main(session, details):
                 start_animation(session, anim=anim)
                 print("response:", response_text, "| anim:", anim)
                 yield session.call("rie.dialogue.say", text=response_text)
-                yield sleep(2)   # wait out the audio
+                yield sleep(0.5)   # wait out the audio
             else:
                 fallback = "Sorry, I couldn't hear you"
                 yield session.call("rie.dialogue.say", text=fallback)
-                yield sleep(2)
+                yield sleep(0.5)
             # Reset AFTER speaking so any stray frames captured mid-speech are dropped.
             finish_dialogue = False
             query = ""
