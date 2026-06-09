@@ -126,7 +126,6 @@ ANIM_BEHAVIORS = {
     "celebrate": "BlocklyDab",
 }
 
-# Check why the LLM doent choose these
 # Custom head-motor keyframes for nodding yes
 NOD_FRAMES = [
     {"time": 400, "data": {"body.head.pitch": 0.1}},
@@ -207,7 +206,8 @@ if patient_profile.get("name"):
         f"You already know this child. Their name is {patient_profile['name']}, "
         f"they are {_age_str}, and they like {_likes}.\n"
         "Greet them warmly by name, like an old friend. Do NOT ask their name or age again.\n"
-        "You may ask if there is anything NEW they like.\n\n"
+        "You may ask if there is anything NEW they like.\n"
+        "Then you should suggest playing the guessing game.\n\n"
         "PROFILE UPDATES:\n"
         "If the child tells you something NEW (a new like, or their age if it was unknown), "
         "report it in the \"profile\" field of your JSON output (see OUTPUT FORMAT). "
@@ -249,7 +249,7 @@ else:
 
 
 
-# ================= START GAME CODE (Needs testing)=================
+# ================= START GAME CODE (Works mostly fine)=================
 MIN_ROUNDS = 2
 MAX_ROUNDS = 4
 
