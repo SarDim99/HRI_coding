@@ -58,32 +58,32 @@ A spoken-dialogue application for the **Alpha Mini** social robot, designed to i
 
 Clone the repository:
 
-\`\`\`shell
+```shell
 git clone https://github.com/SarDim99/HRI_coding.git
-\`\`\`
+```
 
 Or place `test.py` and `requirements.txt` together in a folder. Then open a terminal in that folder.
 
 ### 2. (Recommended) Create and activate a virtual environment
 
 **Windows (PowerShell):**
-\`\`\`powershell
+```powershell
 python -m venv venv
 venv\Scripts\Activate.ps1
-\`\`\`
+```
 
 **macOS / Linux:**
-\`\`\`bash
+```bash
 python3 -m venv venv
 source venv/bin/activate
-\`\`\`
+```
 
 ### 3. Install the dependencies
 
-\`\`\`bash
+```bash
 pip install --upgrade pip
 pip install -r requirements.txt
-\`\`\`
+```
 
 ---
 
@@ -93,10 +93,10 @@ pip install -r requirements.txt
 
 Create a file called **`.env`** next to `test.py`:
 
-\`\`\`
+```
 OPENAI_API_KEY=sk-your_real_openai_key_here
 MISTRAL_TTS_KEY=your_mistral_key_here
-\`\`\`
+```
 
 `load_dotenv()` at the top of the script picks these up. The `OPENAI_API_KEY` is required. The `MISTRAL_TTS_KEY` is only needed if you enable the experimental Mistral voice (disabled by default).
 
@@ -104,7 +104,7 @@ MISTRAL_TTS_KEY=your_mistral_key_here
 
 In `test.py`, near the bottom, replace the placeholder realm with the realm of your robot:
 
-\`\`\`python
+```python
 wamp = Component(
     transports=[{
         "url": "ws://wamp.robotsindeklas.nl",
@@ -113,15 +113,15 @@ wamp = Component(
     }],
     realm="rie.XXXXXXXXXXXXXXXXXXXXXXXX",  # <-- your robot's realm
 )
-\`\`\`
+```
 
 ### 3. (Optional) Change the language
 
 The script speaks English by default. To switch to Dutch, change the language code from `"en"` to `"nl"`:
 
-\`\`\`python
+```python
 yield session.call("rie.dialogue.config.language", lang="en")  # change "en" to "nl"
-\`\`\`
+```
 
 Note that the prompts are written in English, so for a Dutch session you should also translate `ROLE_PROMPT`, `INTRO_PROMPT`, and the game prompts.
 
@@ -137,9 +137,9 @@ To start fresh with a new child, delete `patient_profile.json` (or empty its con
 2. Activate your virtual environment if you created one.
 3. Run the script:
 
-\`\`\`bash
+```bash
 python test.py
-\`\`\`
+```
 
 If everything is configured correctly, the robot will:
 1. Stand up and greet the user.
