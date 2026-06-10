@@ -3,3 +3,4 @@
 *.onnx
 *.pt
 *.png
+**/__pycache__/
