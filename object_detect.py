@@ -42,7 +42,6 @@ class object_detect():
         t.start()
 
         while True:
-            print('jaja')
             if self.latest_frame is None:
                 continue
 
