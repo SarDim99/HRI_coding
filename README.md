@@ -184,6 +184,6 @@ You can follow the session in the terminal, which logs the recognised speech, th
 - **The game never starts.** The model did not emit the `[GAME_START]` marker. Make sure the child clearly agrees to play; check the terminal for the `[GAME_START] marker detected` line.
 - **The same word keeps coming up.** Used words are stored in game state for the session; delete `patient_profile.json` between very short test runs if the interest list is too small to vary.
 - **The robot greets a stranger by the wrong name.** A previous child's profile is still saved. Delete or clear `patient_profile.json`.
-- **Conversation never ends.** The model has not produced a "Bye" and the user has not said `quit` / `exit` / `:q`.
+- **Conversation never ends.** The model has not produced a "Bye"
 
 ---
