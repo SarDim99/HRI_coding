@@ -1,7 +1,9 @@
 {
     "name": "James",
-    "age": null,
+    "age": 26,
     "likes": [
-        "games"
+        "football",
+        "editing",
+        "YouTube videos"
     ]
 }
