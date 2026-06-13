@@ -112,6 +112,8 @@ class flash_card_game():
 
 
     def play_game(self, session, new_game, answer_child):
+        #TODO test if while loop is needed
+        #while: True
         if new_game:
             self.game_dict["is_true"] = False
             self.game_dict['returned_animal'] = None
@@ -130,26 +132,27 @@ class flash_card_game():
                 self.object_det.reset_name()
                 self.object_det.run_camera()
                 get_animal = False
-
+            
             if self.object_det.get_name() != "" and self.game_dict['returned_animal'] == None:
                 self.game_dict["returned_animal"] = self.object_det.get_name()
                 if self.game_dict['returned_animal'] == self.game_dict['target']:
                     self.game_dict["is_true"] = True
-
+            
             if self.game_dict["is_true"] == True and self.game_dict['returned_animal'] != None:
-                text, last_responses = self.queue_response(text="That's correct, good job!", last_responses=last_responses)
+                text = self.queue_response(text="That's correct, good job!")
                 yield session.call("rie.dialogue.say", text=text)
-                
+                yield session.call("rom.optional.behavior.play", name="BlocklyDab")
+    
             if self.game_dict["is_true"] == False and self.game_dict['returned_animal'] != None:
-                text, last_responses = self.queue_response(
-                    text=f"Good try! But that is a {self.game_dict["returned_animal"]}, I choose {self.game_dict['target']}.",
-                    last_responses=last_responses)
+                text = self.queue_response(text=f"Good try! But that is a {self.game_dict["returned_animal"]}, I choose {self.game_dict['target']}.")
                 yield session.call("rie.dialogue.say", text=text)
+                yield session.call("rom.optional.behavior.play", name="BlocklyApplause")
 
-            text, last_responses = self.queue_response(text="Do you want to play another game?", last_responses=last_responses)
+            text = self.queue_response(text="Do you want to play another game?")
             yield session.call("rie.dialogue.say", text= text)
             answer_child = True
-
+            #break
+        print('done')
         return answer_child, new_game
     # @inlineCallbacks
     # def main(self, session, details):

@@ -164,9 +164,9 @@ class object_detect():
 #     pass
 
 
-def main(session, details):
-    behavior(session)
-    pass
+# def main(session, details):
+#     behavior(session)
+#     pass
 
 
 # wamp = Component(
