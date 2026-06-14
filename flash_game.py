@@ -16,7 +16,14 @@ import spacy
 # MODEL_NAME = "gpt-4o-mini"
 
 class flash_card_game():
-    def __init__(self, chatbot, model_name):
+    """
+    A flash card game where the chatbot asks a child to show animal cards.
+    
+    The game uses object detection to identify animals shown by the child
+    and compares them to a randomly selected target animal. The game tracks
+    responses, checks sentence similarity for conversation management
+    """
+    def __init__(self, chatbot, model_name: str):
         print('is gemaakt')
         self.nlp = spacy.load("en_core_web_lg")
         self.chatbot = chatbot
@@ -33,30 +40,78 @@ class flash_card_game():
         self.last_responses = []
         self.threshold_sentence_sim = 0.8
 
-    def get_target(self):
+    def get_threshold(self) -> float:
+        """Return threshold_sentence_sim.
+
+        Returns:
+            float: The current value of threshold_sentence_sim.
+        """
+        return self.threshold_sentence_sim
+    
+    def get_last_responses(self) -> list[str]:
+        """Return last_responses.
+
+        Returns:
+            list[str]: The current value of last_responses.
+        """
+        return self.last_responses
+    
+    def get_answer_child(self) -> bool:
+        """Return answer_child.
+
+        Returns:
+            bool: The current value of answer_child.
+        """
+        return self.answer_child
+    
+    def set_answer_child(self, answer_child: bool):
+        """Set answer_child.
+
+        Args:
+        answer_child (bool): The new value to set for answer_child.
+        """
+        self.answer_child = answer_child
+
+    def get_new_game(self) -> bool:
+        """Return new_game.
+
+        Returns:
+            bool: The current value of new_game.
+        """
+        return self.new_game
+    
+    def set_new_game(self, new_game: bool):
+        """Set new_game.
+
+        Args:
+        new_game (bool): The new value to set for new_game.
+        """
+        self.new_game = new_game
+
+    def get_target(self) -> str:
+        """Select and return a random animal from the predefined list.
+
+        Returns:
+            str: A randomly chosen animal name from the list.
+        """
         animal_list = ["dog", "cat", "elephant", "cow", "horse", "sheep", "zebra", "giraffe", "bear"]
         target = random.choice(animal_list)
         return target
-    
-    def get_threshold(self):
-        return self.threshold_sentence_sim
-    
-    def get_last_responses(self):
-        return self.last_responses
-    
-    def get_answer_child(self):
-        return self.answer_child
-    
-    def set_answer_child(self, answer_child):
-        self.answer_child = answer_child
 
-    def get_new_game(self):
-        return self.new_game
-    
-    def set_new_game(self, new_game):
-        self.new_game = new_game
+    def listen_if_child_want_to_play(self, user_text: str, answer_child: bool) -> tuple[str,bool,bool,bool]:
+        """Process user input and check if the child wants to play another game.
 
-    def listen_if_child_want_to_play(self, user_text: str, answer_child) -> str:
+        Args:
+            user_text (str): The text input from the user.
+            answer_child (bool): Indicating whether the child currently wants to play.
+
+        Returns:
+            tuple[str, bool, bool, bool]:
+                - reply (str): The response to be spoken by teh LLM.
+                - answer_child (bool): Set to False after processing.
+                - new_game (bool): True if the user wants to start a new round.
+                - leave_game (bool): True if the user wants to end the game.
+        """
         new_game = False
         leave_game = False
         reply = ""
@@ -71,8 +126,15 @@ class flash_card_game():
                 reply = "Okay! That was so much fun. Bye!"
         return reply, answer_child, new_game, leave_game
 
-    def wants_replay(self, child_text):
+    def wants_replay(self, child_text: str) -> bool:
+        """Determine if a child wants to play again by classifying their response via chatbot.
 
+        Args:
+            child_text (str): The child's response text to classify for replay intent.
+
+        Returns:
+            bool: True if the classified answer is "yes", False otherwise .
+        """
         REPLAY_PROMPT = (
         "A child was asked if they want to play again.\n"
         'Classify their reply as exactly one of: "yes", "no".\n'
@@ -88,7 +150,17 @@ class flash_card_game():
         )
         return json.loads(r.choices[0].message.content).get("answer", "no") == "yes"
 
-    def check_if_sim(self, query, last_responses, threshold_sentence_sim):
+    def check_if_sim(self, query: str, last_responses: list[str], threshold_sentence_sim: float) -> bool:
+        """Check if the query has high sentence similarity with any recent LLM responses.
+
+        Args:
+            query (str): The input query text to compare against recent LLM responses.
+            last_responses (list[str]): List of recent LLM responses to compare against.
+            threshold_sentence_sim (float): Similarity threshold.
+
+        Returns:
+            bool: True if any response in last_responses has similarity > threshold_sentence_sim, False otherwise.
+        """
         sentence1 = self.nlp(query)
         for response in last_responses:
             sentence2 = self.nlp(response)
@@ -99,19 +171,51 @@ class flash_card_game():
                 return True
         return False
 
-    def queue_response(self, text):
+    def queue_response(self, text: str) -> str:
+        """
+        Add a response to the queue, maintaining a maximum of two entries.
+
+        Args:
+            text (str): The response text to add to the queue.
+
+        Returns:
+            str: The same response text that was added to the queue.
+        """
         if len(self.last_responses) > 1:
             self.last_responses.pop()
         self.last_responses.append(text)
         return text
 
     def explaing_game(self, session):
+        """
+        Explain the game rules to the player via a spoken dialogue.
+
+        Args:
+            session: The active session object.
+        """
         print('ebgin')
         yield session.call("rie.dialogue.say", 
                            text="The game works as follows: I ask you to show me an animal and you show my the card that Illustrates that animal")
 
 
-    def play_game(self, session, new_game, answer_child):
+    def play_game(self, session, new_game: bool, answer_child: bool) -> tuple[bool, bool]:
+        """
+        Execute a single round of the animal card guessing game.
+
+        Manages the full game loop for one round: initializing a new game state,
+        selecting a target animal, capturing the player's card via YOLO
+        evaluating the answer, delivering feedback through dialogue and behavior animations.
+
+        Args:
+            session: The active session object.
+            new_game (bool): If True, resets all game state and initializes a new round.
+            answer_child (bool): If True, The system is awaiting the child's response to play again.
+
+        Returns:
+            tuple[bool, bool]:
+                - answer_child (bool): True if the system is now waiting for the child to decide whether to play again.
+                - new_game (bool): Reflects whether a new game was started.
+        """
         #TODO test if while loop is needed
         #while: True
         if new_game:
