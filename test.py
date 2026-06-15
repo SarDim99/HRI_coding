@@ -10,6 +10,10 @@ import os
 import json
 from dotenv import load_dotenv
 
+import category_game as category_game
+from flash_game import flash_card_game as flash_game
+
+
 load_dotenv()
 
 # I tried to make the code more readable and structured but
@@ -214,11 +218,12 @@ if patient_profile.get("name"):
         "Otherwise omit the field. Never say the profile out loud.\n\n" 
         "Try to find out any missing information about their profile. If none is missing ask the kid what do you want to do today."
         "TRANSITION TO GAME:\n"
-        "As soon as the child agrees to play, you MUST append [GAME_START] at the very "
+        "As soon as the child agrees to play, you MUST append either [CATEGORY_GAME_START] "
+        "or [GUESSING_GAME_START] or [FLASH_GAME_START] at the very "
         "end of the \"text\" field. This is required — without it the game cannot start.\n"
         "Do not keep chatting once they agree. Do not ask more profile questions first.\n"
-        'Example: {"text": "Yay! Let\'s play! [GAME_START]", "animation": "celebrate"}\n'
-        "Do NOT include [GAME_START] before the child has agreed."
+        'Example: {"text": "Yay! Let\'s play! [CATEGORY_GAME_START]", "animation": "celebrate"}\n'
+        "Do NOT include [CATEGORY_GAME_START] before the child has agreed."
     )
 else:
     INTRO_PROMPT = (
@@ -238,13 +243,14 @@ else:
         "Never say the profile out loud.\n\n"
         "TRANSITION TO GAME:\n"
         "Once you know the child's name AND at least one thing they like, suggest "
-        "playing a guessing game (e.g., 'I know a fun game we can play! Want to try?'). "
+        "playing a game (e.g., 'I know a fun game we can play! Want to try?'). "
         "TRANSITION TO GAME:\n"
-        "As soon as the child agrees to play, you MUST append [GAME_START] at the very "
+        "As soon as the child agrees to play, you MUST append either [CATEGORY_GAME_START] "
+        "or [GUESSING_GAME_START] or [FLASH_GAME_START] at the very "
         "end of the \"text\" field. This is required — without it the game cannot start.\n"
         "Do not keep chatting once they agree. Do not ask more profile questions first.\n"
-        'Example: {"text": "Yay! Let\'s play! [GAME_START]", "animation": "celebrate"}\n'
-        "Do NOT include [GAME_START] before the child has agreed."
+        'Example: {"text": "Yay! Let\'s play! [CATEGORY_GAME_START]", "animation": "celebrate"}\n'
+        "Do NOT include [CATEGORY_GAME_START] before the child has agreed."
     )
 
 
@@ -403,20 +409,32 @@ def handle_intro():
 
     save_profile(data.get("profile"))
 
-    if GAME_START_MARKER in reply:
-        print("[GAME] [GAME_START] marker detected -> entering game phase")
+    if GUESSING_GAME_START_MARKER in reply:
+        print("[GAME] [GUESSING_GAME_START] marker detected -> entering guessing game phase")
         global current_phase
-        reply = reply.replace(GAME_START_MARKER, "").strip()
+        reply = reply.replace(GUESSING_GAME_START_MARKER, "").strip()
         current_phase = "game"
         clue_text, clue_anim = start_round("Okay, let's start the game then! Here is your first clue.")
         return (reply + " " + clue_text).strip(), clue_anim
+    elif CATEGORY_GAME_START_MARKER in reply:
+        print("[GAME] [CATEGORY_GAME_START] marker detected -> entering category game phase")
+        reply = reply.replace(CATEGORY_GAME_START_MARKER, "").strip()
+        current_phase = "category_game"
+        return reply, anim
+    elif FLASH_GAME_START_MARKER in reply:
+        print("[GAME] [FLASH_GAME_START] marker detected -> entering flash game phase")
+        reply = reply.replace(FLASH_GAME_START_MARKER, "").strip()
+        current_phase = "flash_game"
+        return reply, anim
 
     return reply, anim
 
 
 
 current_phase = "intro"
-GAME_START_MARKER = "[GAME_START]"
+GUESSING_GAME_START_MARKER = "[GUESSING_GAME_START]"
+CATEGORY_GAME_START_MARKER = "[CATEGORY_GAME_START]"
+FLASH_GAME_START_MARKER = "[FLASH_GAME_START]"
 awaiting_replay = False
 
 
@@ -474,6 +492,10 @@ def ask_llm(user_text: str):
 
     if current_phase == "game":
         text, anim = handling_game(user_text)
+    elif current_phase == "category_game":
+        text, anim = category_game.ask_category_llm(user_text)
+    elif current_phase == "flash_game":
+        text, anim = flash_game.play_game(user_text)
     else:
         text, anim = handle_intro()
 
@@ -574,7 +596,7 @@ wamp = Component(
         "serializers": ["msgpack"],
         "max_retries": 0
     }],
-    realm="rie.6a27ec428a2cba4f82b87631",  # !!!!!!! Check this in case of failure to connect!!!!!!
+    realm="rie.6a2c08bc8a2cba4f82b88a55",  # !!!!!!! Check this in case of failure to connect!!!!!!
 )
 
 wamp.on_join(main)
