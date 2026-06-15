@@ -96,7 +96,7 @@ CATEGORY_SETUP_PROMPT = (
     "about football/sports/games). Choose a category from a completely different "
     "area of life (e.g. food, animals, weather, household, school, body, clothing, "
     "nature, vehicles, colors, seasons).\n\n"
-    "Also prepare 3 hint words (common answers) in case the child gets stuck. "
+    "Also prepare 3 hints in case the child gets stuck. These hints should be given one at a time after 2 consecutive wrong answers, and should get progressively easier. They should be for whichever answers haven't been siad yet. Do NOT give all the hints upfront.\n\n"
     "Do NOT reveal hints upfront.\n\n"
     'Reply with ONE JSON object: {"category": "<label>", "prompt": "<how robot asks, max 12 words>", '
     '"hints": ["<hint 1>", "<hint 2>", "<hint 3>"], "valid_examples": ["<10 common valid answers>"]}'
@@ -165,12 +165,21 @@ def generate_category_round():
         avoid = "\n".join(f"  - {c}" for c in used_categories)
     else:
         avoid = "  (none yet)"
-    system = (
-        CATEGORY_SETUP_PROMPT
-        + f"\n\nThings this child likes (use as inspiration, but vary the topic over time): {likes}"
-        + f"\n\nAlready used categories (avoid these topics/themes):\n{avoid}"
-    )
-    data = call_llm(system, [])
+
+    # Keep the system prompt clean and structured
+    system_instruction = CATEGORY_SETUP_PROMPT
+    
+    # Pass the real-time context as the user payload
+    user_context = [
+        {
+            "role": "user", 
+            "content": f"Child's Interests: {likes}\n\nAlready used categories to avoid:\n{avoid}"
+        }
+    ]
+    
+    # Pass both to the helper
+    data = call_llm(system_instruction, user_context)
+    
     print(f"[CATEGORY] Generated round: {data}")
     save_used_category(data.get("category", "").strip())
     return data

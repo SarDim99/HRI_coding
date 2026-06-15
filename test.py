@@ -77,6 +77,7 @@ INTRO_PROMPT = (
     "2. Discover at least ONE thing they like (hobbies, animals, foods, etc.).\n"
     "3. Have a friendly and natural conversation that makes the child feel "
     "comfortable and supported.\n\n"
+    "4. Always end your response with a question, so the child has something to reply to."
     "PERSONALIZATION: Remember what the child says they like. This will be used "
     "later to create a 'meaningful context' for a game.\n\n"
     "TRANSITION TO GAME:\n"
@@ -217,6 +218,7 @@ if patient_profile.get("name"):
         "report it in the \"profile\" field of your JSON output (see OUTPUT FORMAT). "
         "Otherwise omit the field. Never say the profile out loud.\n\n" 
         "Try to find out any missing information about their profile. If none is missing ask the kid what do you want to do today."
+        "4. Always end your response with a question, so the child has something to reply to.\n\n"
         "TRANSITION TO GAME:\n"
         "As soon as the child agrees to play, you MUST append either [CATEGORY_GAME_START] "
         "or [GUESSING_GAME_START] or [FLASH_GAME_START] at the very "
@@ -236,6 +238,7 @@ else:
         "comfortable and supported.\n\n"
         "PERSONALIZATION: Remember what the child says they like. This will be used "
         "later to create a 'meaningful context' for a game.\n\n"
+        "4. Always end your response with a question, so the child has something to reply to.\n\n"
         "PROFILE SAVING:\n"
         "As soon as you learn the child's name, age, or something they like, report it in the "
         "\"profile\" field of your JSON output (see OUTPUT FORMAT). Send it the moment you learn it; "
@@ -544,7 +547,7 @@ def main(session, details):
 
     # Greet prompt
     session.call("rom.optional.behavior.play", name="BlocklyWaveLeftArm")
-    greeting = "Hello there! I'm Alpha Mini. It's nice to see you!"
+    greeting = "Hello there! I'm Alpha Mini. It's nice to see you! How are you doing today?"
     yield session.call("rie.dialogue.say", text=greeting)
     yield sleep(1)
 
@@ -596,7 +599,7 @@ wamp = Component(
         "serializers": ["msgpack"],
         "max_retries": 0
     }],
-    realm="rie.6a2c08bc8a2cba4f82b88a55",  # !!!!!!! Check this in case of failure to connect!!!!!!
+    realm="rie.6a2fddfb8a2cba4f82b89b18",  # !!!!!!! Check this in case of failure to connect!!!!!!
 )
 
 wamp.on_join(main)
