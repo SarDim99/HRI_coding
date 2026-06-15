@@ -76,8 +76,10 @@ INTRO_PROMPT = (
     "PERSONALIZATION: Remember what the child says they like. This will be used "
     "later to create a 'meaningful context' for a game.\n\n"
     "TRANSITION TO GAME:\n"
-    "Once you know the child's name AND at least one thing they like, suggest "
+    "Once you know the child's name AND at least one thing they like, you MUST suggest "
     "playing a guessing game (e.g., 'I know a fun game we can play! Want to try?'). "
+    "ALWAYS END WITH A QUESTION: Every reply MUST end with one simple "
+    "question or invitation, so the child always has something to say back."
     "TRANSITION TO GAME:\n"
     "As soon as the child agrees to play, you MUST append [GAME_START] at the very "
     "end of the \"text\" field. This is required — without it the game cannot start.\n"
@@ -226,19 +228,16 @@ else:
         "You are having a 'getting-to-know-you' conversation with the child.\n\n"
         "YOUR GOALS FOR THIS PHASE:\n"
         "1. Learn the child's name and age.\n"
-        "2. Discover one or two things they like (hobbies, animals, foods, etc.).\n"
+        "2. Discover at least ONE thing they like (hobbies, animals, foods, etc.).\n"
         "3. Have a friendly and natural conversation that makes the child feel "
         "comfortable and supported.\n\n"
         "PERSONALIZATION: Remember what the child says they like. This will be used "
         "later to create a 'meaningful context' for a game.\n\n"
-        "PROFILE SAVING:\n"
-        "As soon as you learn the child's name, age, or something they like, report it in the "
-        "\"profile\" field of your JSON output (see OUTPUT FORMAT). Send it the moment you learn it; "
-        "do not wait to collect everything. Use null for anything you do not know yet. "
-        "Never say the profile out loud.\n\n"
         "TRANSITION TO GAME:\n"
-        "Once you know the child's name AND at least one thing they like, suggest "
+        "Once you know the child's name AND at least one thing they like, you MUST immediatly suggest "
         "playing a guessing game (e.g., 'I know a fun game we can play! Want to try?'). "
+        "YOU MUST ALWAYS END your answer WITH A QUESTION: Every reply MUST end with one simple "
+        "question or invitation, so the child always has something to say back."
         "TRANSITION TO GAME:\n"
         "As soon as the child agrees to play, you MUST append [GAME_START] at the very "
         "end of the \"text\" field. This is required — without it the game cannot start.\n"
@@ -381,7 +380,7 @@ def handling_game(user_text):
     if game_state["clue_index"] < len(game_state["clues"]):
         clue = game_state["clues"][game_state["clue_index"]]
         game_state["clue_index"] += 1
-        return "Good guess! Here's another clue: " + clue, "think"
+        return "Good guess, but not quite right! Here's another clue: " + clue, "think"
     
     answer = game_state["target"]
     if game_state["round"] >= MAX_ROUNDS:
@@ -494,7 +493,15 @@ finish_dialogue = False
 query = "hello"
 response_text = ""
 
-# Check if this works 
+# Estimate how long the robot will be speaking so we keep the mic muted for that
+# long. say() does not reliably block until the speaker is silent, so a flat sleep
+# let the mic reopen mid-sentence and transcribe our own voice. ~2.5 words/sec
+# matches the TTS rate; the +0.7s covers the audio tail.
+def estimate_speech_time(text):
+    return len(text.split()) / 2.5 + 0.7
+
+
+# Check if this works
 listening = False
 def asr(frames):
     global finish_dialogue, query
@@ -551,11 +558,11 @@ def main(session, details):
                 start_animation(session, anim=anim)
                 print("response:", response_text, "| anim:", anim)
                 yield session.call("rie.dialogue.say", text=response_text)
-                yield sleep(0.5)   # wait out the audio
+                yield sleep(estimate_speech_time(response_text))   # wait out the audio
             else:
                 fallback = "Sorry, I couldn't hear you"
                 yield session.call("rie.dialogue.say", text=fallback)
-                yield sleep(0.5)
+                yield sleep(estimate_speech_time(fallback))
             # Reset AFTER speaking so any stray frames captured mid-speech are dropped.
             finish_dialogue = False
             query = ""
@@ -572,9 +579,9 @@ wamp = Component(
     transports=[{
         "url": "ws://wamp.robotsindeklas.nl",
         "serializers": ["msgpack"],
-        "max_retries": 0
+        "max_retries": -1
     }],
-    realm="rie.6a27ec428a2cba4f82b87631",  # !!!!!!! Check this in case of failure to connect!!!!!!
+    realm="rie.6a2fdf048a2cba4f82b89b1f",  # !!!!!!! Check this in case of failure to connect!!!!!!
 )
 
 wamp.on_join(main)
