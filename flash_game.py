@@ -37,8 +37,17 @@ class flash_card_game():
         self.get_animal= False
         self.answer_child = False
         self.new_game = False
+        self.explained = False
         self.last_responses = []
         self.threshold_sentence_sim = 0.8
+
+    def get_explained(self) -> float:
+        """Return explained.
+
+        Returns:
+            float: The current value of explained.
+        """
+        return self.explained
 
     def get_threshold(self) -> float:
         """Return threshold_sentence_sim.
@@ -94,7 +103,7 @@ class flash_card_game():
         Returns:
             str: A randomly chosen animal name from the list.
         """
-        animal_list = ["dog", "cat", "elephant", "cow", "horse", "sheep", "zebra", "giraffe", "bear"]
+        animal_list = ["dog", "cat", "elephant", "cow", "horse", "zebra", "giraffe", "bear"]
         target = random.choice(animal_list)
         return target
 
@@ -143,7 +152,7 @@ class flash_card_game():
 
 
         r = self.chatbot.chat.completions.create(
-            model=self.MODEL_NAME,
+            model=self.model_name,
             messages=[{"role": "system", "content": REPLAY_PROMPT},
                     {"role": "user", "content": child_text}],
             response_format={"type": "json_object"},
@@ -193,12 +202,12 @@ class flash_card_game():
         Args:
             session: The active session object.
         """
-        print('ebgin')
+        self.explained = True
         yield session.call("rie.dialogue.say", 
                            text="The game works as follows: I ask you to show me an animal and you show my the card that Illustrates that animal")
 
 
-    def play_game(self, session, new_game: bool, answer_child: bool) -> tuple[bool, bool]:
+    def play_game(self, session, new_game: bool) -> tuple[bool, bool]:
         """
         Execute a single round of the animal card guessing game.
 
@@ -210,14 +219,7 @@ class flash_card_game():
             session: The active session object.
             new_game (bool): If True, resets all game state and initializes a new round.
             answer_child (bool): If True, The system is awaiting the child's response to play again.
-
-        Returns:
-            tuple[bool, bool]:
-                - answer_child (bool): True if the system is now waiting for the child to decide whether to play again.
-                - new_game (bool): Reflects whether a new game was started.
         """
-        #TODO test if while loop is needed
-        #while: True
         if new_game:
             self.game_dict["is_true"] = False
             self.game_dict['returned_animal'] = None
@@ -226,120 +228,27 @@ class flash_card_game():
             self.new_game = False
             self.answer_child = False
 
-        if answer_child == False:
-            if self.game_dict['target'] == None:
-                self.game_dict['target'] = self.get_target()
-                get_animal = True
-            yield session.call("rie.dialogue.say", text=f"Can you show me a {self.game_dict["target"]}")
+        self.game_dict['target'] = self.get_target()
+        yield session.call("rie.dialogue.say", text=f"Can you show me a {self.game_dict["target"]}")
 
-            if self.game_dict["returned_animal"] == None and get_animal == True:
-                self.object_det.reset_name()
-                self.object_det.run_camera()
-                get_animal = False
-            
-            if self.object_det.get_name() != "" and self.game_dict['returned_animal'] == None:
-                self.game_dict["returned_animal"] = self.object_det.get_name()
-                if self.game_dict['returned_animal'] == self.game_dict['target']:
-                    self.game_dict["is_true"] = True
-            
-            if self.game_dict["is_true"] == True and self.game_dict['returned_animal'] != None:
-                text = self.queue_response(text="That's correct, good job!")
-                yield session.call("rie.dialogue.say", text=text)
-                yield session.call("rom.optional.behavior.play", name="BlocklyDab")
-    
-            if self.game_dict["is_true"] == False and self.game_dict['returned_animal'] != None:
-                text = self.queue_response(text=f"Good try! But that is a {self.game_dict["returned_animal"]}, I choose {self.game_dict['target']}.")
-                yield session.call("rie.dialogue.say", text=text)
-                yield session.call("rom.optional.behavior.play", name="BlocklyApplause")
-
-            text = self.queue_response(text="Do you want to play another game?")
-            yield session.call("rie.dialogue.say", text= text)
-            answer_child = True
-            #break
-        print('done')
-        return answer_child, new_game
-    # @inlineCallbacks
-    # def main(self, session, details):
-    #     while True:
-    #         yield session.call("rie.dialogue.say", text=f"saysomething")
-
-# @inlineCallbacks
-# def main(session, details):
-#     global finish_dialogue, query, response_text
-
-#     yield session.call("rie.dialogue.config.language", lang="en")
-#     # robot stand up
-#     yield session.call("rom.optional.behavior.play", name="BlocklyStand")
-
-#     # Greet prompt
-#     yield session.call("rie.dialogue.say", text="Hello there! I'm Alpha Mini. It's nice to see you!")
-#     yield session.call("rom.optional.behavior.play", name="BlocklyWaveRightArm")
-    
-
-#     # Speech recognition
-#     yield session.subscribe(asr, "rie.dialogue.stt.stream")
-#     yield session.call("rie.dialogue.stt.stream")
-
-    # loop until the user says exit or quit
-    # dialogue = True
-    # object_det = object_detect()
-    # get_animal= False
-    # answer_child = False
-    # new_game = False
-    # response_text = ""
-    # last_responses = []
-    # threshold_sentence_sim = 0.8
-
-#     while dialogue:        
-#         session.call("rie.vision.face.track")
+        self.object_det.reset_name()
+        self.object_det.run_camera()
         
-#         play_game(session, new_game, answer_child)
+        self.game_dict["returned_animal"] = self.object_det.get_name()
+        if self.game_dict['returned_animal'] == self.game_dict['target']:
+            self.game_dict["is_true"] = True
+        
+        if self.game_dict["is_true"]:
+            text = self.queue_response(text="That's correct, good job!")
+            yield session.call("rie.dialogue.say", text=text)
+            yield session.call("rom.optional.behavior.play", name="BlocklyDab")
 
-#         if "Bye" in response_text:
-#             dialogue = False
-#         if finish_dialogue:
-#             yield session.call("rie.dialogue.stt.close")
-#             yield sleep(1)
-#             if query in exit_conditions:
-#                 dialogue = False
-#                 yield session.call("rie.dialogue.say", text="Goodbye! It was nice talking with you. See you again next time.")
-#                 yield session.call("rom.optional.behavior.play", name="BlocklyWaveRightArm")
-#                 break
-#             elif query != "":
-#                 #check if it lisnt do itself
-#                 if check_if_sim(query, last_responses, threshold_sentence_sim):
-#                     yield session.call("rie.dialogue.stt.stream")
-#                     query = ""
-#                     yield sleep(0.5)
-#                     continue
+        if not self.game_dict["is_true"]:
+            text = self.queue_response(text=f"Good try! But that is a {self.game_dict["returned_animal"]}, I choose {self.game_dict['target']}.")
+            yield session.call("rie.dialogue.say", text=text)
+            yield session.call("rom.optional.behavior.play", name="BlocklyApplause")
 
-#                 response_text, answer_child, new_game, leave_game = listen_if_child_want_to_play(query, answer_child)
-#                 if leave_game:
-#                     dialogue = False
-#                     yield session.call("rie.dialogue.say", text="Goodbye! It was nice talking with you. See you again next time.")
-#                     yield session.call("rom.optional.behavior.play", name="BlocklyWaveRightArm")
-#                     break
-#                 text, last_responses = queue_response(text=response_text, last_responses=last_responses)
-#                 yield session.call("rie.dialogue.say", text=text)
-#             else:
-#                 text, last_responses = queue_response(text="sorry, I couldn't hear you", last_responses=last_responses)
-#                 yield session.call("rie.dialogue.say", text=text)
-#             finish_dialogue = False
-#             query = ""
-#             yield session.call("rie.dialogue.stt.stream")
-#         yield sleep(0.5)
-
-#     yield session.call("rie.dialogue.stt.close")
-#     yield session.call("rom.optional.behavior.play", name="BlocklyCrouch")
-#     session.leave()
-
-# wamp = Component(
-#     transports=[{
-#         "url": "ws://wamp.robotsindeklas.nl",
-#         "serializers": ["msgpack"],
-#         "max_retries": 0
-#     }],
-#     realm="rie.6a2c15248a2cba4f82b88a8e"",  # !!!!!!! Check this in case of failure to connect!!!!!!
-# )
-
-# wamp.on_join(main)
+        text = self.queue_response(text="Do you want to play another game?")
+        yield session.call("rie.dialogue.say", text= text)
+        self.answer_child = True
+  
