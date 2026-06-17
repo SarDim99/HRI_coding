@@ -9,18 +9,10 @@ import base64
 import os
 import json
 from dotenv import load_dotenv
-from flash_game import flash_card_game
 
-# import argparse
+import category_game as category_game
+from flash_game import flash_card_game as flash_game
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument(
-#     "game",
-#     choices=["guess", "flash", "category"],
-#     help="Choose one of: guess, flash, category",
-# )
-
-# args = parser.parse_args()
 
 load_dotenv()
 
@@ -94,6 +86,7 @@ INTRO_PROMPT = (
     "2. Discover at least ONE thing they like (hobbies, animals, foods, etc.).\n"
     "3. Have a friendly and natural conversation that makes the child feel "
     "comfortable and supported.\n\n"
+    "4. Always end your response with a question, so the child has something to reply to."
     "PERSONALIZATION: Remember what the child says they like. This will be used "
     "later to create a 'meaningful context' for a game.\n\n"
     "TRANSITION TO GAME:\n"
@@ -235,6 +228,7 @@ if patient_profile.get("name"):
         "report it in the \"profile\" field of your JSON output (see OUTPUT FORMAT). "
         "Otherwise omit the field. Never say the profile out loud.\n\n" 
         "Try to find out any missing information about their profile. If none is missing ask the kid what do you want to do today."
+        "4. Always end your response with a question, so the child has something to reply to.\n\n"
         "TRANSITION TO GAME:\n"
         "As soon as the child agrees to play, you MUST append either [CATEGORY_GAME_START] "
         "or [GUESSING_GAME_START] or [FLASH_GAME_START] at the very "
@@ -254,6 +248,7 @@ else:
         "comfortable and supported.\n\n"
         "PERSONALIZATION: Remember what the child says they like. This will be used "
         "later to create a 'meaningful context' for a game.\n\n"
+        "4. Always end your response with a question, so the child has something to reply to.\n\n"
         "PROFILE SAVING:\n"
         "As soon as you learn the child's name, age, or something they like, report it in the "
         "\"profile\" field of your JSON output (see OUTPUT FORMAT). Send it the moment you learn it; "
@@ -261,9 +256,9 @@ else:
         "Never say the profile out loud.\n\n"
         "TRANSITION TO GAME:\n"
         "Once you know the child's name AND at least one thing they like, suggest "
-        "playing a guessing game (e.g., 'I know a fun game we can play! Want to try?'). "
+        "playing a game (e.g., 'I know a fun game we can play! Want to try?'). "
         "TRANSITION TO GAME:\n"
-         "As soon as the child agrees to play, you MUST append either [CATEGORY_GAME_START] "
+        "As soon as the child agrees to play, you MUST append either [CATEGORY_GAME_START] "
         "or [GUESSING_GAME_START] or [FLASH_GAME_START] at the very "
         "end of the \"text\" field. This is required — without it the game cannot start.\n"
         "Do not keep chatting once they agree. Do not ask more profile questions first.\n"
@@ -428,28 +423,31 @@ def handle_intro():
 
     save_profile(data.get("profile"))
 
-    if GAME_START_MARKER in reply:
-        print("[GAME] [GAME_START] marker detected -> entering game phase")
-        # global current_phase
-        reply = reply.replace(GAME_START_MARKER, "").strip()
+    if GUESSING_GAME_START_MARKER in reply:
+        print("[GAME] [GUESSING_GAME_START] marker detected -> entering guessing game phase")
+        global current_phase
+        reply = reply.replace(GUESSING_GAME_START_MARKER, "").strip()
         current_phase = "game"
         clue_text, clue_anim = start_round("Okay, let's start the game then! Here is your first clue.")
         return (reply + " " + clue_text).strip(), clue_anim
-    
-    if FLASH_GAME_START_MARKER in reply:
-        print("[GAME] [FLASH_GAME_START] marker detected -> entering Flash game phase")
-        
+    elif CATEGORY_GAME_START_MARKER in reply:
+        print("[GAME] [CATEGORY_GAME_START] marker detected -> entering category game phase")
+        reply = reply.replace(CATEGORY_GAME_START_MARKER, "").strip()
+        current_phase = "category_game"
+        return reply, anim
+    elif FLASH_GAME_START_MARKER in reply:
+        print("[GAME] [FLASH_GAME_START] marker detected -> entering flash game phase")
         reply = reply.replace(FLASH_GAME_START_MARKER, "").strip()
         current_phase = "flash_game"
-        # clue_text, clue_anim = start_round("Okay, let's start the game then! Here is your first clue.")
-        return reply, anim 
+        return reply, anim
 
     return reply, anim
 
 
 
 current_phase = "intro"
-GAME_START_MARKER = "[GAME_START]"
+GUESSING_GAME_START_MARKER = "[GUESSING_GAME_START]"
+CATEGORY_GAME_START_MARKER = "[CATEGORY_GAME_START]"
 FLASH_GAME_START_MARKER = "[FLASH_GAME_START]"
 awaiting_replay = False
 
@@ -508,6 +506,10 @@ def ask_llm(user_text: str):
 
     if current_phase == "game":
         text, anim = handling_game(user_text)
+    elif current_phase == "category_game":
+        text, anim = category_game.ask_category_llm(user_text)
+    elif current_phase == "flash_game":
+        text, anim = flash_game.play_game(user_text)
     else:
         text, anim = handle_intro()
 
@@ -558,7 +560,7 @@ def main(session, details):
 
     # Greet prompt
     session.call("rom.optional.behavior.play", name="BlocklyWaveLeftArm")
-    greeting = "Hello there! I'm Alpha Mini. It's nice to see you!"
+    greeting = "Hello there! I'm Alpha Mini. It's nice to see you! How are you doing today?"
     yield session.call("rie.dialogue.say", text=greeting)
     yield sleep(1)
 
@@ -643,7 +645,7 @@ wamp = Component(
         "serializers": ["msgpack"],
         "max_retries": 0
     }],
-    realm="rie.6a3001778a2cba4f82b89bbf",  # !!!!!!! Check this in case of failure to connect!!!!!!
+    realm="rie.6a2fddfb8a2cba4f82b89b18",  # !!!!!!! Check this in case of failure to connect!!!!!!
 )
 
 wamp.on_join(main)
