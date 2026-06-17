@@ -19,7 +19,6 @@ class flash_card_game():
     responses, checks sentence similarity for conversation management
     """
     def __init__(self, chatbot, model_name: str):
-        print('is gemaakt')
         self.nlp = spacy.load("en_core_web_lg")
         self.chatbot = chatbot
         self.model_name = model_name
