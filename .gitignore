@@ -3,4 +3,6 @@
 *.onnx
 *.pt
 *.png
-**/__pycache__/
+__pycache__/
+*.pyc
+audio/
