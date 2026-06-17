@@ -218,6 +218,7 @@ python category_game.py
 This project was developed as part of the **Human-Robot Interaction for Social Robots** course at the **University of Groningen**.
 
 **Students:** Ashmit Badhe, Dimitris Sarris, and Daan de Groot
+
 **Instructor:** Paul Vogt
 
 ---
