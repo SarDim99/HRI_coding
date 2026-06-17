@@ -1,3 +1,7 @@
 autobahn[twisted,serialization]
 pyopenssl
 alpha_mini_rug
+openai
+dotenv
+mistralai
+service_identity
