@@ -9,6 +9,18 @@ import base64
 import os
 import json
 from dotenv import load_dotenv
+from flash_game import flash_card_game
+
+# import argparse
+
+# parser = argparse.ArgumentParser()
+# parser.add_argument(
+#     "game",
+#     choices=["guess", "flash", "category"],
+#     help="Choose one of: guess, flash, category",
+# )
+
+# args = parser.parse_args()
 
 load_dotenv()
 
@@ -30,6 +42,15 @@ MODEL_NAME = "gpt-4o-mini"
 
 chatbot = OpenAI(api_key=os.getenv("OPENAI_API_KEY")) # Not adding the key due to deactivation when uploaded to github.
 voicebot = Mistral(api_key=os.getenv("MISTRAL_TTS_KEY"))
+
+# flash_game = False
+
+# if args.game == "flash":
+#     flash_game = True
+#     card_game = flash_card_game(chatbot, MODEL_NAME)
+#     print("card_game", card_game)
+#     print(card_game.get_target())
+
 
 # Single patient for now. If we have time we can make it multi-patient
 PROFILE_PATH = "patient_profile.json"
@@ -79,11 +100,12 @@ INTRO_PROMPT = (
     "Once you know the child's name AND at least one thing they like, suggest "
     "playing a guessing game (e.g., 'I know a fun game we can play! Want to try?'). "
     "TRANSITION TO GAME:\n"
-    "As soon as the child agrees to play, you MUST append [GAME_START] at the very "
+    "As soon as the child agrees to play, you MUST append either [CATEGORY_GAME_START] "
+    "or [GUESSING_GAME_START] or [FLASH_GAME_START] at the very "
     "end of the \"text\" field. This is required — without it the game cannot start.\n"
     "Do not keep chatting once they agree. Do not ask more profile questions first.\n"
-    'Example: {"text": "Yay! Let\'s play! [GAME_START]", "animation": "celebrate"}\n'
-    "Do NOT include [GAME_START] before the child has agreed."
+    'Example: {"text": "Yay! Let\'s play! [CATEGORY_GAME_START]", "animation": "celebrate"}\n'
+    "Do NOT include [CATEGORY_GAME_START] before the child has agreed."
 )
 
 # Instructions for the game phase
@@ -214,11 +236,12 @@ if patient_profile.get("name"):
         "Otherwise omit the field. Never say the profile out loud.\n\n" 
         "Try to find out any missing information about their profile. If none is missing ask the kid what do you want to do today."
         "TRANSITION TO GAME:\n"
-        "As soon as the child agrees to play, you MUST append [GAME_START] at the very "
+        "As soon as the child agrees to play, you MUST append either [CATEGORY_GAME_START] "
+        "or [GUESSING_GAME_START] or [FLASH_GAME_START] at the very "
         "end of the \"text\" field. This is required — without it the game cannot start.\n"
         "Do not keep chatting once they agree. Do not ask more profile questions first.\n"
-        'Example: {"text": "Yay! Let\'s play! [GAME_START]", "animation": "celebrate"}\n'
-        "Do NOT include [GAME_START] before the child has agreed."
+        'Example: {"text": "Yay! Let\'s play! [CATEGORY_GAME_START]", "animation": "celebrate"}\n'
+        "Do NOT include [CATEGORY_GAME_START] before the child has agreed."
     )
 else:
     INTRO_PROMPT = (
@@ -240,11 +263,12 @@ else:
         "Once you know the child's name AND at least one thing they like, suggest "
         "playing a guessing game (e.g., 'I know a fun game we can play! Want to try?'). "
         "TRANSITION TO GAME:\n"
-        "As soon as the child agrees to play, you MUST append [GAME_START] at the very "
+         "As soon as the child agrees to play, you MUST append either [CATEGORY_GAME_START] "
+        "or [GUESSING_GAME_START] or [FLASH_GAME_START] at the very "
         "end of the \"text\" field. This is required — without it the game cannot start.\n"
         "Do not keep chatting once they agree. Do not ask more profile questions first.\n"
-        'Example: {"text": "Yay! Let\'s play! [GAME_START]", "animation": "celebrate"}\n'
-        "Do NOT include [GAME_START] before the child has agreed."
+        'Example: {"text": "Yay! Let\'s play! [CATEGORY_GAME_START]", "animation": "celebrate"}\n'
+        "Do NOT include [CATEGORY_GAME_START] before the child has agreed."
     )
 
 
@@ -391,6 +415,7 @@ def handling_game(user_text):
 
 # Phase handling 
 def handle_intro():
+    global current_phase
     system_message = ROLE_PROMPT + "\n\n" + INTRO_PROMPT + "\n\n" + ANIMATION_PROMPT
     response = chatbot.chat.completions.create(
         model=MODEL_NAME,
@@ -405,11 +430,19 @@ def handle_intro():
 
     if GAME_START_MARKER in reply:
         print("[GAME] [GAME_START] marker detected -> entering game phase")
-        global current_phase
+        # global current_phase
         reply = reply.replace(GAME_START_MARKER, "").strip()
         current_phase = "game"
         clue_text, clue_anim = start_round("Okay, let's start the game then! Here is your first clue.")
         return (reply + " " + clue_text).strip(), clue_anim
+    
+    if FLASH_GAME_START_MARKER in reply:
+        print("[GAME] [FLASH_GAME_START] marker detected -> entering Flash game phase")
+        
+        reply = reply.replace(FLASH_GAME_START_MARKER, "").strip()
+        current_phase = "flash_game"
+        # clue_text, clue_anim = start_round("Okay, let's start the game then! Here is your first clue.")
+        return reply, anim 
 
     return reply, anim
 
@@ -417,6 +450,7 @@ def handle_intro():
 
 current_phase = "intro"
 GAME_START_MARKER = "[GAME_START]"
+FLASH_GAME_START_MARKER = "[FLASH_GAME_START]"
 awaiting_replay = False
 
 
@@ -510,6 +544,8 @@ def asr(frames):
 @inlineCallbacks
 def main(session, details):
     global finish_dialogue, query, response_text, listening
+    #TODO check if here otherwise global
+    card_game = flash_card_game(chatbot, MODEL_NAME)
 
     # Set language to English
     yield session.call("rie.dialogue.config.language", lang="en")
@@ -529,14 +565,24 @@ def main(session, details):
     # Speech recognition
     yield session.subscribe(asr, "rie.dialogue.stt.stream")
     yield session.call("rie.dialogue.stt.stream")
+    print('end')
     listening = True
-
     # loop until the user says exit or quit
     dialogue = True
+
+    # card_game.main(session)
+
     while dialogue:
+        if current_phase == "flash_game" and card_game.get_answer_child() == False:
+            if card_game.get_explained():
+                yield from card_game.explaing_game(session)
+            print('something')
+            yield from card_game.play_game(session, card_game.get_new_game())
+
         if "Bye" in response_text:
             dialogue = False
         if finish_dialogue:
+            print('test5')
             # Stop listening while we think and speak, so the robot
             # never transcribes its own voice.
             listening = False
@@ -547,14 +593,37 @@ def main(session, details):
                 yield session.call("rie.dialogue.say", text="Goodbye! It was nice talking with you. See you again next time.")
                 break
             elif query != "":
-                response_text, anim = ask_llm(query)
-                start_animation(session, anim=anim)
-                print("response:", response_text, "| anim:", anim)
-                yield session.call("rie.dialogue.say", text=response_text)
-                yield sleep(0.5)   # wait out the audio
+                print('test4')
+                if current_phase != "flash_game":
+                    print(' test2')
+                    response_text, anim = ask_llm(query)
+                    start_animation(session, anim=anim)
+                    print("response:", response_text, "| anim:", anim)
+                    yield session.call("rie.dialogue.say", text=response_text)
+                    yield sleep(0.5)   # wait out the audio
+                elif current_phase == "flash_game" and card_game.get_answer_child() == True:
+                    print(' test3')
+                    if card_game.check_if_sim(query, card_game.get_last_responses(), card_game.get_threshold()):
+                        query = ""
+                        yield session.call("rie.dialogue.stt.stream")
+                        yield sleep(0.5)
+                        continue
+                    response_text, answer_child, new_game, leave_game = card_game.listen_if_child_want_to_play(query, card_game.get_answer_child())
+                    card_game.set_answer_child(answer_child)
+                    card_game.set_new_game(new_game)
+                    if leave_game:
+                        dialogue = False
+                        yield session.call("rie.dialogue.say", text="Goodbye! It was nice talking with you. See you again next time.")
+                        yield session.call("rom.optional.behavior.play", name="BlocklyWaveRightArm")
+                        break
+                    text = card_game.queue_response(text=response_text)
+                    yield session.call("rie.dialogue.say", text=text)
             else:
                 fallback = "Sorry, I couldn't hear you"
-                yield session.call("rie.dialogue.say", text=fallback)
+                if current_phase == "flash_game":
+                    print('ets7')
+                    fallback = card_game.queue_response(text="sorry, I couldn't hear you")     
+                # yield session.call("rie.dialogue.say", text=fallback)
                 yield sleep(0.5)
             # Reset AFTER speaking so any stray frames captured mid-speech are dropped.
             finish_dialogue = False
@@ -574,7 +643,7 @@ wamp = Component(
         "serializers": ["msgpack"],
         "max_retries": 0
     }],
-    realm="rie.6a27ec428a2cba4f82b87631",  # !!!!!!! Check this in case of failure to connect!!!!!!
+    realm="rie.6a3001778a2cba4f82b89bbf",  # !!!!!!! Check this in case of failure to connect!!!!!!
 )
 
 wamp.on_join(main)
