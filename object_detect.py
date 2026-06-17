@@ -27,7 +27,6 @@ class object_detect():
         """
         Reset the detection state to prepare for a new detection round.
         """
-        # self.latest_frame = None
         self.name = ""
         self.running = True
 
@@ -54,8 +53,6 @@ class object_detect():
         """
         Start real-time animal detection using the webcam and YOLO model.
         """
-        # print("nu pas")
-        # print(self.name)
         t = Thread(target=self.grab_frames, daemon=True)
         t.start()
 
@@ -70,17 +67,14 @@ class object_detect():
 
             frame = self.latest_frame.copy()
             self.last_infer_time = now
-
             results = self.model.predict(frame, imgsz=320, conf=0.5, verbose=False, classes = [15, 16, 17, 18, 19, 20, 21, 22, 23, 24])
             for _, cls, _ in zip(results[0].boxes.xyxy, results[0].boxes.cls, results[0].boxes.conf):
                 self.name = results[0].names[int(cls)]
-                # print(self.name)
 
             annotated = results[0].plot()
             cv2.imshow("YOLO", annotated)
 
             if cv2.waitKey(1) & 0xFF == ord("q") or self.name != "":
-                # print("bye")
                 self.running = False
                 break
 

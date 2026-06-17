@@ -98,7 +98,7 @@ class flash_card_game():
         Returns:
             str: A randomly chosen animal name from the list.
         """
-        animal_list = ["dog", "cat", "elephant", "cow", "horse", "zebra", "giraffe", "bear"]
+        animal_list = ["dog", "cat", "elephant", "cow", "horse", "zebra", "giraffe", "bear", "sheep"]
         target = random.choice(animal_list)
         return target
 
@@ -168,9 +168,6 @@ class flash_card_game():
         sentence1 = self.nlp(query)
         for response in last_responses:
             sentence2 = self.nlp(response)
-            print("last response:", response)
-            print("quary: ", query)
-            print("sim: ", sentence1.similarity(sentence2))
             if sentence1.similarity(sentence2) > threshold_sentence_sim:
                 return True
         return False

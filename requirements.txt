@@ -5,3 +5,6 @@ openai
 dotenv
 mistralai
 service_identity
+ultralytics
+spacy
+click
