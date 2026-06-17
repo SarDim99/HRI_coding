@@ -11,7 +11,7 @@ import json
 from dotenv import load_dotenv
 
 import category_game as category_game
-from flash_game import flash_card_game as flash_game
+from flash_game import flash_card_game
 
 
 load_dotenv()
@@ -173,42 +173,49 @@ def build_intro_prompt():
         age = patient_profile.get("age")
         age_str = f"{age} years old" if isinstance(age, int) else "the same age as before"
         return (
-            "CURRENT PHASE: WELCOMING BACK\n"
-            f"You already know this child. Their name is {patient_profile['name']}, "
-            f"they are {age_str}, and they like {likes}.\n"
-            "Greet them warmly by name, like an old friend. Do NOT ask their name or age again.\n"
-            "You may ask if there is anything NEW they like.\n"
-            "Then you should suggest playing the guessing game.\n\n"
-            "PROFILE UPDATES:\n"
-            "If the child tells you something NEW (a new like, or their age if it was unknown), "
-            "report it in the \"profile\" field of your JSON output (see OUTPUT FORMAT). "
-            "Otherwise omit the field. Never say the profile out loud.\n\n"
-            "Try to find out any missing information about their profile. If none is missing ask the kid what do you want to do today."
-            "TRANSITION TO GAME:\n"
-            "As soon as the child agrees to play, you MUST append [GAME_START] at the very "
-            "end of the \"text\" field. This is required - without it the game cannot start.\n"
-            "Do not keep chatting once they agree. Do not ask more profile questions first.\n"
-            'Example: {"text": "Yay! Let\'s play! [GAME_START]", "animation": "celebrate"}\n'
-            "Do NOT include [GAME_START] before the child has agreed."
+        "CURRENT PHASE: WELCOMING BACK\n"
+        f"You already know this child. Their name is {patient_profile['name']}, "
+        f"they are {age_str}, and they like {likes}.\n"
+        "Greet them warmly by name, like an old friend. Do NOT ask their name or age again.\n"
+        "You may ask if there is anything NEW they like.\n"
+        "Then you should suggest playing the guessing game.\n\n"
+        "PROFILE UPDATES:\n"
+        "If the child tells you something NEW (a new like, or their age if it was unknown), "
+        "report it in the \"profile\" field of your JSON output (see OUTPUT FORMAT). "
+        "Otherwise omit the field. Never say the profile out loud.\n\n" 
+        "Try to find out any missing information about their profile. If none is missing ask the kid what do you want to do today."
+        "4. Always end your response with a question, so the child has something to reply to.\n\n"
+        "TRANSITION TO GAME:\n"
+        "As soon as the child agrees to play, you MUST append either [CATEGORY_GAME_START] "
+        "or [GUESSING_GAME_START] or [FLASH_GAME_START] at the very "
+        "end of the \"text\" field. This is required — without it the game cannot start.\n"
+        "Do not keep chatting once they agree. Do not ask more profile questions first.\n"
+        'Example: {"text": "Yay! Let\'s play! [CATEGORY_GAME_START]", "animation": "celebrate"}\n'
+        "Do NOT include [CATEGORY_GAME_START] before the child has agreed."
         )
     return (
         "CURRENT PHASE: INTRODUCTION\n"
         "You are having a 'getting-to-know-you' conversation with the child.\n\n"
         "YOUR GOALS FOR THIS PHASE:\n"
         "1. Learn the child's name and age.\n"
-        "2. Discover at least ONE thing they like (hobbies, animals, foods, etc.).\n"
+        "2. Discover one or two things they like (hobbies, animals, foods, etc.).\n"
         "3. Have a friendly and natural conversation that makes the child feel "
         "comfortable and supported.\n\n"
         "PERSONALIZATION: Remember what the child says they like. This will be used "
         "later to create a 'meaningful context' for a game.\n\n"
+        "4. Always end your response with a question, so the child has something to reply to.\n\n"
+        "PROFILE SAVING:\n"
+        "As soon as you learn the child's name, age, or something they like, report it in the "
+        "\"profile\" field of your JSON output (see OUTPUT FORMAT). Send it the moment you learn it; "
+        "do not wait to collect everything. Use null for anything you do not know yet. "
+        "Never say the profile out loud.\n\n"
         "TRANSITION TO GAME:\n"
-        "Once you know the child's name AND at least one thing they like, you MUST immediatly suggest "
-        "playing a guessing game (e.g., 'I know a fun game we can play! Want to try?'). "
-        "YOU MUST ALWAYS END your answer WITH A QUESTION: Every reply MUST end with one simple "
-        "question or invitation, so the child always has something to say back."
+        "Once you know the child's name AND at least one thing they like, suggest "
+        "playing a game (e.g., 'I know a fun game we can play! Want to try?'). "
         "TRANSITION TO GAME:\n"
-        "As soon as the child agrees to play, you MUST append [GAME_START] at the very "
-        "end of the \"text\" field. This is required - without it the game cannot start.\n"
+        "As soon as the child agrees to play, you MUST append either [CATEGORY_GAME_START] "
+        "or [GUESSING_GAME_START] or [FLASH_GAME_START] at the very "
+        "end of the \"text\" field. This is required — without it the game cannot start.\n"
         "Do not keep chatting once they agree. Do not ask more profile questions first.\n"
         'Example: {"text": "Yay! Let\'s play! [CATEGORY_GAME_START]", "animation": "celebrate"}\n'
         "Do NOT include [CATEGORY_GAME_START] before the child has agreed."
@@ -280,7 +287,10 @@ game_state = {
 
 # Phase + transition globals.
 current_phase = "intro"            # intro -> game
-GAME_START_MARKER = "[GAME_START]"  # appended by the model when the child agrees to play
+# GAME_START_MARKER = "[GAME_START]"  # appended by the model when the child agrees to play
+GUESSING_GAME_START_MARKER = "[GUESSING_GAME_START]"
+CATEGORY_GAME_START_MARKER = "[CATEGORY_GAME_START]"
+FLASH_GAME_START_MARKER = "[FLASH_GAME_START]"
 awaiting_replay = False            # True while we wait for a yes/no play again answer
 
 
@@ -426,7 +436,6 @@ def handle_intro():
 
 conversation_history: list[dict] = []
 
-
 def ask_llm(user_text: str):
     global awaiting_replay
     conversation_history.append({"role": "user", "content": user_text})
@@ -444,9 +453,7 @@ def ask_llm(user_text: str):
         text, anim = handling_game(user_text)
     elif current_phase == "category_game":
         text, anim = category_game.ask_category_llm(user_text)
-    elif current_phase == "flash_game":
-        text, anim = flash_game.play_game(user_text)
-    else:
+    elif current_phase == "intro":
         text, anim = handle_intro()
 
     conversation_history.append({"role": "assistant", "content": text})
@@ -507,7 +514,6 @@ def asr(frames):
 @inlineCallbacks
 def main(session, details):
     global finish_dialogue, query, response_text, listening
-    #TODO check if here otherwise global
     card_game = flash_card_game(chatbot, MODEL_NAME)
 
     # Set language to English
@@ -524,19 +530,15 @@ def main(session, details):
     # Open the speech-recognition stream
     yield session.subscribe(asr, "rie.dialogue.stt.stream")
     yield session.call("rie.dialogue.stt.stream")
-    print('end')
     listening = True
 
     # One pass per recognised utterance, until Bye or an exit word
     dialogue = True
 
-    # card_game.main(session)
-
     while dialogue:
         if current_phase == "flash_game" and card_game.get_answer_child() == False:
             if card_game.get_explained():
                 yield from card_game.explaing_game(session)
-            print('something')
             yield from card_game.play_game(session, card_game.get_new_game())
 
         if "Bye" in response_text:
@@ -544,19 +546,37 @@ def main(session, details):
         if finish_dialogue:
             listening = False
             yield session.call("rie.dialogue.stt.close")
-            print("also here ", query)
             if query in exit_conditions:
                 dialogue = False
                 yield session.call("rie.dialogue.say", text="Goodbye! It was nice talking with you. See you again next time.")
                 break
             elif query != "":
-                response_text, anim = ask_llm(query)
-                start_animation(session, anim=anim)
-                print("response:", response_text, "| anim:", anim)
-                yield session.call("rie.dialogue.say", text=response_text)
-                yield sleep(estimate_speech_time(response_text))   # wait out the audio
+                if current_phase != "flash_game":
+                    response_text, anim = ask_llm(query)
+                    start_animation(session, anim=anim)
+                    print("response:", response_text, "| anim:", anim)
+                    yield session.call("rie.dialogue.say", text=response_text)
+                    yield sleep(estimate_speech_time(response_text))   # wait out the audio
+                elif current_phase == "flash_game" and card_game.get_answer_child() == True:
+                    if card_game.check_if_sim(query, card_game.get_last_responses(), card_game.get_threshold()):
+                        query = ""
+                        yield session.call("rie.dialogue.stt.stream")
+                        yield sleep(estimate_speech_time(response_text))
+                        continue
+                    response_text, answer_child, new_game, leave_game = card_game.listen_if_child_want_to_play(query, card_game.get_answer_child())
+                    card_game.set_answer_child(answer_child)
+                    card_game.set_new_game(new_game)
+                    if leave_game:
+                        dialogue = False
+                        yield session.call("rie.dialogue.say", text="Goodbye! It was nice talking with you. See you again next time.")
+                        yield session.call("rom.optional.behavior.play", name="BlocklyWaveRightArm")
+                        break
+                    text = card_game.queue_response(text=response_text)
+                    yield session.call("rie.dialogue.say", text=text)
             else:
                 fallback = "Sorry, I couldn't hear you"
+                if current_phase == "flash_game":
+                    fallback = card_game.queue_response(text="sorry, I couldn't hear you")     
                 yield session.call("rie.dialogue.say", text=fallback)
                 yield sleep(estimate_speech_time(fallback))
             # Reset AFTER speaking so any stray frames captured mid-speech are dropped.

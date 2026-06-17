@@ -10,11 +10,6 @@ import json
 import random
 import spacy
 
-# Env = Path(__file__).resolve().parent / '.env'
-# load_dotenv(dotenv_path=Env)
-
-# MODEL_NAME = "gpt-4o-mini"
-
 class flash_card_game():
     """
     A flash card game where the chatbot asks a child to show animal cards.
